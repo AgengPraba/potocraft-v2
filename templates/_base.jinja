@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@5"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>{% block title %}Potocraft{% endblock %}</title>
+  </head>
+  <body class="bg-base-200">
+    {% include 'components/navbar.html' %}
+    <main>{% block content%} {% endblock %}</main>
+    {% include 'components/footer.html' %}
+    {% block scripts %} 
+      <script>
+        document.addEventListener('DOMContentLoaded', () => {
+        const toggle = document.querySelector('.theme-controller');
+        const savedTheme = localStorage.getItem('theme');
+
+        if (savedTheme === 'synthwave') {
+          toggle.checked = true;
+          updateTheme(true);
+        } else {
+          toggle.checked = false;
+          updateTheme(false);
+        }
+
+        toggle.addEventListener('change', () => {
+          updateTheme(toggle.checked);
+        });
+      });
+       // Fungsi update tema dan localStorage
+       function updateTheme(isDark) {
+         if (isDark) {
+           document.documentElement.classList.add('dark');
+           localStorage.setItem('theme', 'synthwave');
+         } else {
+           document.documentElement.classList.remove('dark');
+           localStorage.setItem('theme', 'light');
+         }
+       }
+      </script>
+
+    {% endblock %}
+  </body>
+</html>

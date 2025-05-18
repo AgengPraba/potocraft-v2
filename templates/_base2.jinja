@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@3.8.0/themes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@3.8.0/dist/full.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cropper.js -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+    <title>{% block title %}Potocraft{% endblock %}</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    plugins: [daisyui],
+    daisyui: {
+      themes: ["light", "synthwave"], // kamu bisa tambah tema lain juga
+    },
+  }
+</script>
+
+  </head>
+  <body class="bg-base-200">
+    {% include 'components/navbar.html' %}
+    <main>{% block content%} {% endblock %}</main>
+    {% include 'components/footer.html' %}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.querySelector('.theme-controller');
+    const savedTheme = localStorage.getItem('theme');
+
+    if (savedTheme === 'synthwave') {
+      toggle.checked = true;
+      updateTheme(true);
+    } else {
+      toggle.checked = false;
+      updateTheme(false);
+    }
+
+    toggle.addEventListener('change', () => {
+      updateTheme(toggle.checked);
+    });
+  });
+  // Fungsi update tema dan localStorage
+  function updateTheme(isDark) {
+    if (isDark) {
+      document.documentElement.setAttribute('data-theme', 'synthwave');
+      localStorage.setItem('theme', 'synthwave');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  }
+  </script>
+    {% block scripts %}   {% endblock %}
+  </body>
+</html>
