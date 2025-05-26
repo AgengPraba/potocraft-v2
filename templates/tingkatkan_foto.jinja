@@ -1,0 +1,132 @@
+{% extends '_base.jinja' %}
+{% block title %}Tingkatkan Kualitas Foto - Potocraft{% endblock %}
+
+{% block content %}
+<div class="card w-full max-w-2xl bg-base-100 shadow-xl mx-auto">
+  <div class="card-body">
+    <h2 class="card-title text-2xl">Tingkatkan Kualitas Foto</h2>
+    <p>Upload gambar untuk meningkatkan resolusi atau kejernihannya (fitur placeholder).</p>
+
+    <div class="form-control mt-4">
+      <label class="label" for="imageUploadEnhance">
+        <span class="label-text">Pilih Gambar</span>
+      </label>
+      <input type="file" id="imageUploadEnhance" accept="image/*" class="file-input file-input-bordered file-input-accent w-full" />
+    </div>
+
+    <div class="form-control mt-4">
+        <label class="label" for="enhancementType">
+            <span class="label-text">Jenis Peningkatan:</span>
+        </label>
+        <select id="enhancementType" class="select select-bordered w-full">
+            <option value="sharpen">Pertajam (Sharpen)</option>
+            <option value="super_resolution">Resolusi Super (Placeholder)</option>
+            <option value="denoise">Hilangkan Noise (Placeholder)</option>
+        </select>
+    </div>
+     <div class="form-control mt-4">
+        <label class="label" for="enhancementLevel">
+            <span class="label-text">Tingkat Peningkatan (1-5):</span>
+        </label>
+        <input type="range" id="enhancementLevel" min="1" max="5" value="3" class="range range-accent" step="1" />
+        <div class="w-full flex justify-between text-xs px-2">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+        </div>
+    </div>
+
+
+    <div class="card-actions justify-end mt-6">
+      <button id="processEnhanceBtn" class="btn btn-accent">Tingkatkan Foto</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+      <div>
+        <h3 class="font-semibold mb-2">Gambar Asli:</h3>
+        <img id="originalPreviewEnhance" src="#" alt="Preview Asli" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
+        <div id="originalPlaceholderEnhance" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Asli</div>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Hasil Peningkatan:</h3>
+        <img id="processedPreviewEnhance" src="#" alt="Preview Hasil" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
+        <div id="processedPlaceholderEnhance" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Hasil</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const imageUpload = document.getElementById('imageUploadEnhance');
+    const originalPreview = document.getElementById('originalPreviewEnhance');
+    const originalPlaceholder = document.getElementById('originalPlaceholderEnhance');
+    const processedPreview = document.getElementById('processedPreviewEnhance');
+    const processedPlaceholder = document.getElementById('processedPlaceholderEnhance');
+    const enhancementType = document.getElementById('enhancementType');
+    const enhancementLevel = document.getElementById('enhancementLevel');
+    const processBtn = document.getElementById('processEnhanceBtn');
+    let uploadedFile = null;
+
+    imageUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            uploadedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalPreview.src = e.target.result;
+                originalPreview.style.display = 'block';
+                originalPlaceholder.style.display = 'none';
+                processedPreview.style.display = 'none';
+                processedPlaceholder.style.display = 'block';
+                processedPreview.src = '#';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    processBtn.addEventListener('click', () => {
+        if (!uploadedFile) {
+            alert('Silakan pilih gambar terlebih dahulu.');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+        formData.append('enhancement_type', enhancementType.value);
+        formData.append('enhancement_level', enhancementLevel.value);
+
+        processedPlaceholder.textContent = 'Memproses...';
+        processedPlaceholder.style.display = 'flex';
+        processedPreview.style.display = 'none';
+
+        fetch("{{ url_for('process.process_enhance_photo') }}", { // Perlu route baru di process.py
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Gagal memproses gambar.')});
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.url) {
+                processedPreview.src = data.url + '?t=' + new Date().getTime();
+                processedPreview.style.display = 'block';
+                processedPlaceholder.style.display = 'none';
+            } else if (data.error) {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan: ' + error.message);
+            processedPlaceholder.textContent = 'Preview Hasil';
+            processedPlaceholder.style.display = 'flex';
+            processedPreview.style.display = 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

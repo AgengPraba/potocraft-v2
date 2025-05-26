@@ -8,7 +8,7 @@ def index():
 
 @main_bp.route('/pasfoto')
 def pasfoto():
-    return render_template('pasfoto.jinja')
+    return render_template('pasfoto2.jinja')
 
 @main_bp.route('/hapus-background')
 def hapus_background():
@@ -22,6 +22,6 @@ def tingkatkan_foto():
 def kompresi_foto():
     return render_template('kompresi_foto.jinja')
 
-@main_bp.route('/photobox')
-def photobox():
-    return render_template('photobox.jinja')
+@main_bp.route('/photobooth')
+def photobooth_page():
+    return render_template('photobooth.jinja', title="Photobooth - Potocraft")

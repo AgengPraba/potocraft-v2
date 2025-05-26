@@ -1,0 +1,138 @@
+{% extends '_base.jinja' %}
+{% block title %}Photobooth - Potocraft{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+  #webcamFeed, #capturedImagePreview {
+    width: 100%;
+    max-width: 640px; /* Sesuaikan ukuran maksimum video/gambar */
+    height: auto;
+    border: 2px solid hsl(var(--b3)); /* Border dari DaisyUI */
+    background-color: hsl(var(--b2)); /* Background netral */
+    border-radius: var(--rounded-box, 1rem); /* Menggunakan variabel radius dari DaisyUI */
+    margin: 1rem auto;
+    display: block;
+  }
+  #captureCanvas {
+    display: none; /* Canvas digunakan di background, tidak perlu terlihat */
+  }
+  .photobooth-controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card w-full max-w-3xl bg-base-100 shadow-xl mx-auto">
+  <div class="card-body items-center text-center">
+    <h2 class="card-title text-2xl">Photobooth Potocraft!</h2>
+    <p class="mb-4">Senyum dan ambil foto Anda!</p>
+
+    <div class="w-full">
+      <video id="webcamFeed" autoplay playsinline></video>
+      <canvas id="captureCanvas"></canvas> </div>
+
+    <div class="photobooth-controls">
+      <button id="startWebcamBtn" class="btn btn-secondary">Mulai Kamera</button>
+      <button id="captureBtn" class="btn btn-primary" disabled>Ambil Foto!</button>
+    </div>
+
+    <div class="mt-4 w-full">
+      <h3 class="font-semibold mb-2 text-lg">Hasil Foto:</h3>
+      <img id="capturedImagePreview" src="#" alt="Hasil Foto yang Diambil" style="display:none;" />
+      <div id="capturedPlaceholder" class="w-full max-w-md rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50 mx-auto">Preview Foto</div>
+      <a id="downloadPhotoBtn" class="btn btn-accent mt-4" style="display:none;">Unduh Foto</a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const videoElement = document.getElementById('webcamFeed');
+    const canvasElement = document.getElementById('captureCanvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const startWebcamBtn = document.getElementById('startWebcamBtn');
+    const capturedImagePreview = document.getElementById('capturedImagePreview');
+    const capturedPlaceholder = document.getElementById('capturedPlaceholder');
+    const downloadPhotoBtn = document.getElementById('downloadPhotoBtn');
+    let stream = null;
+
+    async function startWebcam() {
+        try {
+            if (stream) { // Hentikan stream lama jika ada
+                stream.getTracks().forEach(track => track.stop());
+            }
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+            videoElement.srcObject = stream;
+            captureBtn.disabled = false;
+            startWebcamBtn.textContent = 'Ganti/Restart Kamera';
+            showNotification('Kamera berhasil diaktifkan!', 'success');
+            capturedImagePreview.style.display = 'none';
+            capturedPlaceholder.style.display = 'flex';
+            downloadPhotoBtn.style.display = 'none';
+
+        } catch (err) {
+            console.error("Error mengakses webcam: ", err);
+            showNotification(`Tidak bisa mengakses kamera: ${err.message}`, 'error');
+            captureBtn.disabled = true;
+            startWebcamBtn.textContent = 'Coba Lagi Kamera';
+        }
+    }
+
+    function capturePhoto() {
+        if (!stream || !stream.active) {
+            showNotification('Stream kamera tidak aktif. Mulai kamera terlebih dahulu.', 'warning');
+            return;
+        }
+        const context = canvasElement.getContext('2d');
+        // Set ukuran canvas sesuai dengan ukuran video actual
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        
+        // Gambar frame video saat ini ke canvas
+        context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        
+        // Dapatkan data URL dari canvas
+        const dataUrl = canvasElement.toDataURL('image/png');
+        
+        // Tampilkan di preview
+        capturedImagePreview.src = dataUrl;
+        capturedImagePreview.style.display = 'block';
+        capturedPlaceholder.style.display = 'none';
+        
+        // Siapkan tombol download
+        downloadPhotoBtn.href = dataUrl;
+        downloadPhotoBtn.download = `photobooth_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}.png`;
+        downloadPhotoBtn.style.display = 'inline-flex'; // atau 'block'
+
+        showNotification('Foto berhasil diambil!', 'success');
+    }
+
+    startWebcamBtn.addEventListener('click', startWebcam);
+    captureBtn.addEventListener('click', capturePhoto);
+
+    // Fungsi notifikasi sederhana (bisa diambil dari pasfoto2.jinja jika ada standarisasi)
+    function showNotification(message, type = 'info') {
+        // Untuk konsistensi, idealnya Anda punya satu fungsi notifikasi global
+        alert(`${type.toUpperCase()}: ${message}`);
+        console.log(`Notification (${type}): ${message}`);
+    }
+
+    // Hentikan stream kamera saat halaman ditutup atau pengguna navigasi ke halaman lain
+    window.addEventListener('beforeunload', () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+    });
+});
+</script>
+{% endblock %}

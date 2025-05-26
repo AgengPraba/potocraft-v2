@@ -1,0 +1,130 @@
+{% extends '_base.jinja' %}
+{% block title %}Hapus Background - Potocraft{% endblock %}
+
+{% block content %}
+<div class="card w-full max-w-2xl bg-base-100 shadow-xl mx-auto">
+  <div class="card-body">
+    <h2 class="card-title text-2xl">Hapus Background Foto</h2>
+    <p>Upload gambar Anda untuk menghapus atau mengganti background.</p>
+
+    <div class="form-control mt-4">
+      <label class="label" for="imageUploadRemoveBg">
+        <span class="label-text">Pilih Gambar</span>
+      </label>
+      <input type="file" id="imageUploadRemoveBg" accept="image/*" class="file-input file-input-bordered file-input-primary w-full" />
+    </div>
+
+    <div class="form-control mt-4">
+      <label class="label" for="bgColorRemoveBg">
+        <span class="label-text">Warna Background Baru (Kosongkan untuk Transparan)</span>
+      </label>
+      <div class="flex items-center gap-2">
+        <input type="color" id="bgColorRemoveBg" value="#FFFFFF" class="input input-sm input-bordered h-10 w-16" />
+        <button id="transparentBtnRemoveBg" class="btn btn-sm btn-ghost">Buat Transparan</button>
+      </div>
+    </div>
+
+    <div class="card-actions justify-end mt-6">
+      <button id="processRemoveBgBtn" class="btn btn-primary">Hapus Background</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+      <div>
+        <h3 class="font-semibold mb-2">Gambar Asli:</h3>
+        <img id="originalPreviewRemoveBg" src="#" alt="Preview Asli" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
+        <div id="originalPlaceholderRemoveBg" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Asli</div>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Hasil Proses:</h3>
+        <img id="processedPreviewRemoveBg" src="#" alt="Preview Hasil" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
+        <div id="processedPlaceholderRemoveBg" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Hasil</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const imageUpload = document.getElementById('imageUploadRemoveBg');
+    const originalPreview = document.getElementById('originalPreviewRemoveBg');
+    const originalPlaceholder = document.getElementById('originalPlaceholderRemoveBg');
+    const processedPreview = document.getElementById('processedPreviewRemoveBg');
+    const processedPlaceholder = document.getElementById('processedPlaceholderRemoveBg');
+    const bgColorInput = document.getElementById('bgColorRemoveBg');
+    const transparentBtn = document.getElementById('transparentBtnRemoveBg');
+    const processBtn = document.getElementById('processRemoveBgBtn');
+    let uploadedFile = null;
+
+    imageUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            uploadedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalPreview.src = e.target.result;
+                originalPreview.style.display = 'block';
+                originalPlaceholder.style.display = 'none';
+                processedPreview.style.display = 'none';
+                processedPlaceholder.style.display = 'block';
+                processedPreview.src = '#';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    transparentBtn.addEventListener('click', () => {
+        // Untuk benar-benar transparan, kita bisa mengirim nilai khusus ke backend
+        // atau backend bisa mendeteksi jika tidak ada warna yang diberikan.
+        // Untuk UI, kita bisa mengosongkan color picker atau memberinya tanda.
+        // Untuk demo ini, anggap backend akan handle jika bgColor kosong/null.
+        bgColorInput.value = ''; // Atau cara lain menandakan transparan
+        alert("Background akan dibuat transparan. Klik 'Hapus Background'.");
+    });
+
+    processBtn.addEventListener('click', () => {
+        if (!uploadedFile) {
+            alert('Silakan pilih gambar terlebih dahulu.');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+        formData.append('bgColor', bgColorInput.value); // Kirim warna, atau string kosong untuk transparan
+
+        // Tampilkan spinner/loading
+        processedPlaceholder.textContent = 'Memproses...';
+        processedPlaceholder.style.display = 'flex';
+        processedPreview.style.display = 'none';
+
+        fetch("{{ url_for('process.process_remove_background') }}", { // Perlu route baru di process.py
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Gagal memproses gambar.')});
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.url) {
+                processedPreview.src = data.url + '?t=' + new Date().getTime(); // Cache buster
+                processedPreview.style.display = 'block';
+                processedPlaceholder.style.display = 'none';
+            } else if (data.error) {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan: ' + error.message);
+            processedPlaceholder.textContent = 'Preview Hasil'; // Reset placeholder
+            processedPlaceholder.style.display = 'flex';
+            processedPreview.style.display = 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

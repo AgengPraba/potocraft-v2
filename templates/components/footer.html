@@ -10,6 +10,7 @@
         --delay: -2.4069091223159713s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -30,6 +31,7 @@
         --delay: -2.0007036082018796s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -40,6 +42,7 @@
         --delay: -3.6562241011493417s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -70,6 +73,7 @@
         --delay: -3.568108120778955s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -80,6 +84,7 @@
         --delay: -3.0936009341143484s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -90,6 +95,7 @@
         --delay: -3.073407373382319s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -370,6 +376,7 @@
         --delay: -3.7506563716677155s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -380,6 +387,7 @@
         --delay: -2.5489014552237097s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -470,6 +478,7 @@
         --delay: -3.639854967098652s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -480,6 +489,7 @@
         --delay: -2.241124247352089s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -500,6 +510,7 @@
         --delay: -2.2829784223065217s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -510,6 +521,7 @@
         --delay: -2.0675710915725167s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -530,6 +542,7 @@
         --delay: -2.49039727262529s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -540,6 +553,7 @@
         --delay: -3.7734402090165875s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -550,6 +564,7 @@
         --delay: -2.200181875163917s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -560,6 +575,7 @@
         --delay: -3.057622165755107s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -570,6 +586,7 @@
         --delay: -2.687153265082269s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -580,6 +597,7 @@
         --delay: -3.654766681060289s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -590,6 +608,7 @@
         --delay: -2.2768245365402207s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -600,6 +619,7 @@
         --delay: -3.097907354758578s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -610,6 +630,7 @@
         --delay: -3.503296260789588s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -700,6 +721,7 @@
         --delay: -3.421072971477732s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -710,6 +732,7 @@
         --delay: -3.642996382388448s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -830,6 +853,7 @@
         --delay: -3.854503435745722s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -840,6 +864,7 @@
         --delay: -2.448995559316756s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1090,6 +1115,7 @@
         --delay: -2.0415224584408733s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1100,6 +1126,7 @@
         --delay: -2.0077774955964416s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1140,6 +1167,7 @@
         --delay: -3.026178260081916s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1150,6 +1178,7 @@
         --delay: -2.412238238231114s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1220,6 +1249,7 @@
         --delay: -3.206042618229276s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1230,6 +1260,7 @@
         --delay: -3.890730349224847s;
       "
     ></div>
+
     <div
       class="bubble"
       style="
@@ -1320,8 +1351,7 @@
     <div>
       <a
         class="image"
-        href="https://codepen.io/z-"
-        target="_blank"
+        href="/"
         style="
           background-image: url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/199011/happy.svg');
         "
@@ -1348,3 +1378,23 @@
     </filter>
   </defs>
 </svg>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (window.innerWidth <= 640) {
+      const bubbles = document.querySelectorAll(".bubble");
+
+      bubbles.forEach((bubble) => {
+        const styleAttr = bubble.getAttribute("style") || "";
+        const match = styleAttr.match(/--position:\s*([\d.]+)%/);
+
+        if (match) {
+          const position = parseFloat(match[1]);
+          if (position > 90) {
+            bubble.style.display = "none"; // atau bubble.remove();
+          }
+        }
+      });
+    }
+  });
+</script>

@@ -1,0 +1,545 @@
+{% extends '_base.jinja' %}
+{% block title %}Pas Foto - Potocraft{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+  #cropImageContainer {
+    width: 100%;
+    aspect-ratio: auto; 
+    min-height: 300px;
+    max-height: 60vh; 
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 1rem;
+    background-color: hsl(var(--b2)); 
+    border: 1px solid hsl(var(--b3)); 
+    position: relative; 
+    overflow: hidden; 
+  }
+  #cropImage { 
+    display: block;
+    max-width: 100%;
+    max-height: 100%; 
+  }
+  .tabs input[type="radio"]:disabled + label.tab,
+  .tabs input[type="radio"][role="tab"]:disabled { 
+    color: hsl(var(--bc) / 0.4); 
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  #initialPreview, #bgResult, #finalPreviewImage { /* #outfitPreview dihapus */
+    max-width: 280px; 
+    max-height: 380px;
+    border: 1px solid hsl(var(--b3)); 
+    margin: 1rem auto; 
+    background-color: hsl(var(--b2)); 
+    object-fit: contain; 
+  }
+  #bgLivePreviewCanvas {
+    display: none; 
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 flex-grow">
+  <div role="tablist" class="tabs tabs-lifted w-full md:w-3/4 mx-auto">
+
+    <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-0" aria-label="Upload" checked />
+    <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6">
+      <h2 class="text-xl font-bold mb-4">1. Upload Foto</h2>
+      <div id="drop-area" class="border-dashed border-4 border-base-300/50 p-6 text-center rounded-lg hover:bg-base-200 transition-colors">
+        <p class="text-lg">Drag & Drop Foto Di Sini atau</p>
+        <input type="file" id="photoInput" accept="image/*" class="file-input file-input-bordered file-input-primary w-full max-w-xs mt-4" />
+        <div class="mt-6 text-center">
+            <h3 class="text-md font-semibold text-base-content/70">Preview Awal:</h3>
+            <img id="initialPreview" class="rounded-md" style="display: none;" />
+            <p id="imageNamePreview" class="mt-2 text-sm text-base-content/60"></p>
+        </div>
+      </div>
+    </div>
+
+    <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-1" aria-label="Ukuran" disabled />
+    <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6">
+      <h2 class="text-xl font-bold mb-4">2. Pilih Ukuran Rasio (untuk Crop)</h2>
+      <select id="ratioSelect" class="select select-bordered select-primary w-full max-w-xs">
+        <option value="NaN">Bebas (Free)</option>
+        <option value="{{ 2/3 }}">2x3</option>
+        <option value="{{ 3/4 }}">3x4</option>
+        <option value="{{ 4/6 }}">4x6 (Sama dengan 2x3)</option>
+        <option value="{{ 1/1 }}">1x1 (Kotak)</option>
+      </select>
+      <p class="mt-2 text-sm text-base-content/60">Rasio ini akan diterapkan pada alat crop.</p>
+    </div>
+
+    <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-2" aria-label="Crop" disabled />
+    <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6">
+      <h2 class="text-xl font-bold mb-4">3. Crop Foto & Kecerahan</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2">
+          <div id="cropImageContainer">
+            <img id="cropImage" alt="Area Crop Gambar"/>
+          </div>
+        </div>
+        <div class="lg:col-span-1 space-y-4">
+          <div>
+            <h3 class="font-semibold mb-2">Tools Crop</h3>
+            <div class="flex justify-start gap-2 mb-4">
+              <button id="zoom-in" class="btn btn-outline btn-sm" title="Perbesar">Zoom +</button>
+              <button id="zoom-out" class="btn btn-outline btn-sm" title="Perkecil">Zoom -</button>
+              <button id="reset-crop" class="btn btn-outline btn-sm" title="Reset">Reset</button>
+            </div>
+          </div>
+          <div>
+            <h3 class="font-semibold mb-1">Kecerahan</h3>
+            <input type="range" id="brightness-slider" min="0.5" max="1.5" step="0.05" value="1" class="range range-xs range-info" />
+            <div class="text-xs text-base-content/60">Nilai: <span id="brightness-value">100</span>%</div>
+            <button id="reset-brightness" class="btn btn-xs btn-ghost mt-1">Reset Kecerahan</button>
+            <p class="text-xs text-info mt-1">Kecerahan akan diterapkan pada gambar hasil crop.</p>
+          </div>
+          <button id="submitCropBtn" class="btn btn-success w-full mt-4">Simpan Crop & Lanjutkan</button>
+        </div>
+      </div>
+    </div>
+
+    <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-3" aria-label="Background" disabled />
+    <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6">
+      <h2 class="text-xl font-bold mb-4">4. Atur Latar Belakang</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+            <h3 class="font-semibold mb-2 text-base-content/70">Preview (Live Update Warna):</h3>
+            <img id="bgResult" class="rounded-md" style="display: none;" alt="Preview Background" />
+            <canvas id="bgLivePreviewCanvas"></canvas> 
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="label"><span class="label-text">Pilih Warna Kustom:</span></label>
+            <input type="color" id="bgColorInput" value="#FF0000" class="input input-bordered h-12 w-full max-w-xs" />
+          </div>
+          <div>
+            <label class="label"><span class="label-text">Warna Cepat:</span></label>
+            <div class="flex flex-wrap gap-2" id="quickColorButtonsContainer">
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #FF0000;" data-color="#FF0000" aria-label="Pilih warna merah"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #0000FF;" data-color="#0000FF" aria-label="Pilih warna biru"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #FFFFFF;" data-color="#FFFFFF" aria-label="Pilih warna putih"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #FFFF00;" data-color="#FFFF00" aria-label="Pilih warna kuning"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #008000;" data-color="#008000" aria-label="Pilih warna hijau"></button>
+            </div>
+          </div>
+          <button id="removeBgBtn" class="btn btn-accent w-full mt-4">Proses Background & Lanjutkan ke Download</button>
+        </div>
+      </div>
+    </div>
+
+    <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-4" aria-label="Download" disabled />
+    <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6">
+      <h2 class="text-xl font-bold mb-2">5. Unduh Foto (Sebelumnya 6)</h2>
+      <p class="mb-4">Foto Anda siap untuk diunduh!</p>
+      <div class="text-center mb-4">
+          <img id="finalPreviewImage" src="#" alt="Hasil Akhir Foto" style="display:none;" class="border rounded-md shadow-lg"/>
+      </div>
+      <a id="downloadBtn" class="btn btn-primary btn-lg w-full max-w-xs mx-auto" href="#" download="pas_foto_hasil.png">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 mr-2 inline-block">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Unduh Hasil
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script> 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("PASFOTO2.JINJA: DOMContentLoaded.");
+    let cropper = null;
+    let uploadedFilename = null;        
+    let originalUploadedFilename = null; 
+    let croppedFilename = null;         
+    let bgRemovedFilename = null;       
+    let transparentBgFilename = null;   
+    // outfitAppliedFilename DIHAPUS
+    let finalFilenameForDownload = null;
+
+    const dropArea = document.getElementById('drop-area');
+    const photoInput = document.getElementById('photoInput');
+    const initialPreviewEl = document.getElementById('initialPreview');
+    const imageNamePreviewEl = document.getElementById('imageNamePreview');
+    
+    const ratioSelect = document.getElementById('ratioSelect');
+    const cropImageEl = document.getElementById('cropImage');
+    const cropImageContainer = document.getElementById('cropImageContainer');
+
+    const zoomInBtn = document.getElementById('zoom-in');
+    const zoomOutBtn = document.getElementById('zoom-out');
+    const resetCropBtn = document.getElementById('reset-crop');
+    const brightnessSlider = document.getElementById('brightness-slider');
+    const brightnessValueEl = document.getElementById('brightness-value');
+    const resetBrightnessBtn = document.getElementById('reset-brightness');
+    const submitCropBtn = document.getElementById('submitCropBtn');
+
+    const bgColorInput = document.getElementById('bgColorInput');
+    const quickColorButtonsContainer = document.getElementById('quickColorButtonsContainer');
+    const removeBgBtn = document.getElementById('removeBgBtn');
+    const bgResultEl = document.getElementById('bgResult');
+    const bgLivePreviewCanvas = document.getElementById('bgLivePreviewCanvas'); 
+
+    // Variabel dan elemen terkait Outfit DIHAPUS
+    // const outfitChoicesContainer = document.getElementById('outfitChoicesContainer');
+    // const skipOutfitBtn = document.getElementById('skipOutfitBtn');
+    // const outfitPreviewEl = document.getElementById('outfitPreview');
+
+    const finalPreviewImageEl = document.getElementById('finalPreviewImage');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    const tabRadios = [];
+    // Loop hanya sampai 4 karena tab Outfit (index 4 lama) dihapus, Download jadi index 4 baru
+    for (let i = 0; i <= 4; i++) { 
+        const radio = document.getElementById(`tab-radio-${i}`);
+        if (radio) tabRadios.push(radio); else console.warn(`Tab radio 'tab-radio-${i}' not found.`);
+    }
+
+    function showSpinner(message = "Memproses...") { console.log(message); }
+    function hideSpinner() { console.log("Selesai."); }
+    function showNotification(message, type = 'info') { alert(`${type.toUpperCase()}: ${message}`); console.log(`Notification (${type}): ${message}`);}
+
+    function enableTab(tabIndex, autoNavigate = false) {
+        console.log(`Enabling tab ${tabIndex}, autoNav: ${autoNavigate}`);
+        // Pastikan tabIndex valid untuk tabRadios yang sekarang lebih pendek
+        if (tabIndex < tabRadios.length && tabRadios[tabIndex]) {
+            tabRadios[tabIndex].disabled = false;
+            if (autoNavigate) {
+                tabRadios[tabIndex].checked = true;
+                tabRadios[tabIndex].dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        } else { console.warn(`Tab radio for index ${tabIndex} not found or out of bounds.`); }
+    }
+    
+    function resetToUploadStep() {
+        console.log("Resetting to upload step.");
+        uploadedFilename = null; originalUploadedFilename = null; croppedFilename = null;
+        bgRemovedFilename = null; transparentBgFilename = null; 
+        // outfitAppliedFilename DIHAPUS
+        finalFilenameForDownload = null;
+
+        if(initialPreviewEl) { initialPreviewEl.style.display = 'none'; initialPreviewEl.src = '#';}
+        if(imageNamePreviewEl) imageNamePreviewEl.textContent = '';
+        if (cropper) { cropper.destroy(); cropper = null; }
+        if(cropImageEl) cropImageEl.src = '#'; 
+        
+        if(bgResultEl) { bgResultEl.style.display = 'none'; bgResultEl.src = '#';}
+        // outfitPreviewEl DIHAPUS
+        // if(outfitPreviewEl) { outfitPreviewEl.style.display = 'none'; outfitPreviewEl.src = '#';}
+        if(finalPreviewImageEl) { finalPreviewImageEl.style.display = 'none'; finalPreviewImageEl.src = '#';}
+        if(downloadBtn) downloadBtn.setAttribute('href', '#');
+
+        if(brightnessSlider) brightnessSlider.value = 1; 
+        if(brightnessValueEl) brightnessValueEl.textContent = '100'; 
+        if (cropImageContainer && cropImageContainer.style.filter) cropImageContainer.style.filter = ''; 
+        if (cropImageEl && cropImageEl.style.filter) cropImageEl.style.filter = '';
+
+        // Loop disesuaikan karena jumlah tab berkurang
+        for (let i = 1; i < tabRadios.length; i++) { 
+            if(tabRadios[i]) tabRadios[i].disabled = true;
+        }
+        if(tabRadios[0]) {
+            tabRadios[0].checked = true;
+            tabRadios[0].dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    // --- Event Listeners --- (Upload, Ukuran, Crop tetap sama)
+    if (dropArea) {
+        dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.classList.add('bg-base-200'); });
+        dropArea.addEventListener('dragleave', () => dropArea.classList.remove('bg-base-200'));
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault(); dropArea.classList.remove('bg-base-200');
+            if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
+        });
+    }
+
+    if (photoInput) {
+        photoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+        });
+    }
+
+    function handleFileUpload(file) {
+        console.log("handleFileUpload:", file.name);
+        if (!file || !file.type.startsWith('image/')) { showNotification('Harap pilih file gambar.', 'error'); return; }
+        resetToUploadStep(); 
+        showSpinner('Mengupload gambar...');
+        originalUploadedFilename = file.name; 
+
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        fetch("{{ url_for('process.upload_file') }}", { method: 'POST', body: formData })
+            .then(response => {
+                hideSpinner();
+                if (!response.ok) {
+                    response.json().then(errData => showNotification(`Upload Gagal: ${errData.error || response.statusText}`, 'error'))
+                                .catch(() => showNotification(`Upload Gagal: ${response.statusText}`, 'error'));
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) { showNotification(data.error, 'error'); throw new Error(data.error); }
+                uploadedFilename = data.filename; 
+                finalFilenameForDownload = uploadedFilename;
+                const imageUrl = `${data.url}?t=${new Date().getTime()}`;
+                if(initialPreviewEl) { initialPreviewEl.src = imageUrl; initialPreviewEl.style.display = 'block'; }
+                if(imageNamePreviewEl) imageNamePreviewEl.textContent = file.name; 
+                if(cropImageEl) cropImageEl.src = imageUrl;
+                showNotification('Upload berhasil!', 'success');
+                enableTab(1, true); 
+            })
+            .catch(error => {
+                hideSpinner(); console.error("Upload error:", error); resetToUploadStep();
+            });
+    }
+
+    if(ratioSelect) {
+        ratioSelect.addEventListener('change', () => {
+            if (cropper) cropper.setAspectRatio(parseFloat(ratioSelect.value) || NaN);
+            if (uploadedFilename) {
+                enableTab(2, true); 
+                if (!cropper && cropImageEl && cropImageEl.src && !cropImageEl.src.endsWith('#')) initializeCropper();
+            }
+        });
+    }  
+    
+    tabRadios.forEach((radio, index) => {
+        if (radio) {
+            radio.addEventListener('change', () => {
+                if (radio.checked) console.log(`Tab ${index} selected.`);
+                if (radio.checked && index === 2 && uploadedFilename && !cropper) { 
+                    if (cropImageEl && cropImageEl.src && !cropImageEl.src.endsWith('#')) initializeCropper();
+                }
+            });
+        }
+    });
+
+    function initializeCropper() {
+        if (cropper) cropper.destroy();
+        if (!cropImageEl || !cropImageEl.src || cropImageEl.src.endsWith('#')) {
+            showNotification("Sumber gambar crop tidak valid.", "error"); return;
+        }
+        cropper = new Cropper(cropImageEl, {
+            aspectRatio: parseFloat(ratioSelect.value) || NaN, viewMode: 1, dragMode: 'move',
+            autoCropArea: 0.9, responsive: true, background: true, modal: true, guides: true,
+            ready: () => { 
+                applyVisualBrightnessToCropperImage(parseFloat(brightnessSlider.value)); 
+            }
+        });
+    }
+
+    if(zoomInBtn) zoomInBtn.addEventListener('click', () => cropper && cropper.zoom(0.1));
+    if(zoomOutBtn) zoomOutBtn.addEventListener('click', () => cropper && cropper.zoom(-0.1));
+    if(resetCropBtn) resetCropBtn.addEventListener('click', () => {
+        if (cropper) {
+            cropper.reset();
+            if(brightnessSlider) brightnessSlider.value = 1;
+            if(brightnessValueEl) brightnessValueEl.textContent = '100';
+            applyVisualBrightnessToCropperImage(1);
+        }
+    });
+
+    if(brightnessSlider) {
+        brightnessSlider.addEventListener('input', (e) => {
+            const factor = parseFloat(e.target.value);
+            if(brightnessValueEl) brightnessValueEl.textContent = Math.round(factor * 100); 
+            applyVisualBrightnessToCropperImage(factor);
+        });
+    }
+    
+    function applyVisualBrightnessToCropperImage(factor) {
+        const cropperImgElement = cropImageContainer.querySelector('.cropper-canvas img');
+        if (cropperImgElement) { 
+            cropperImgElement.style.filter = `brightness(${factor})`;
+        } else if (cropImageEl) {
+            cropImageEl.style.filter = `brightness(${factor})`;
+        }
+    }
+
+    if(resetBrightnessBtn) {
+        resetBrightnessBtn.addEventListener('click', () => {
+            if(brightnessSlider) brightnessSlider.value = 1; 
+            if(brightnessValueEl) brightnessValueEl.textContent = '100';
+            applyVisualBrightnessToCropperImage(1);
+        });
+    }
+
+    if(submitCropBtn) {
+        submitCropBtn.addEventListener('click', () => {
+            if (!cropper || !uploadedFilename) { showNotification('Tidak ada gambar untuk di-crop.', 'error'); return; }
+            showSpinner('Memproses crop...');
+            const currentBrightnessFactor = parseFloat(brightnessSlider.value);
+
+            cropper.getCroppedCanvas({ imageSmoothingQuality: 'high', fillColor: '#fff' }).toBlob((blob) => {
+                if (!blob) { hideSpinner(); showNotification('Gagal mendapatkan data crop.', 'error'); return; }
+                
+                const formData = new FormData();
+                formData.append('cropped', blob, `${originalUploadedFilename.split('.')[0]}_cropped.png`);
+                formData.append('brightness', currentBrightnessFactor.toString()); 
+                formData.append('original_filename', originalUploadedFilename); 
+
+                fetch("{{ url_for('process.crop_image') }}", { method: 'POST', body: formData })
+                    .then(response => { 
+                        hideSpinner();
+                        if (!response.ok) { 
+                             response.json().then(errData => showNotification(`Crop Gagal: ${errData.error || response.statusText}`, 'error'))
+                                .catch(() => showNotification(`Crop Gagal: ${response.statusText}`, 'error'));
+                            throw new Error(`Crop failed: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) { showNotification(data.error, 'error'); throw new Error(data.error); }
+                        croppedFilename = data.filename;
+                        finalFilenameForDownload = croppedFilename;
+                        const croppedImageUrl = `${data.url}?t=${new Date().getTime()}`;
+                        if(bgResultEl) { bgResultEl.src = croppedImageUrl; bgResultEl.style.display = 'block';} 
+                        showNotification('Crop berhasil!', 'success');
+                        enableTab(3, true); 
+                    })
+                    .catch(error => { 
+                        hideSpinner(); console.error("Crop error:", error); 
+                    });
+            }, 'image/png');
+        });
+    } 
+
+    // --- 3. Background Logic (Tetap sama dengan live preview) ---
+    let isInitialBgProcessDone = false; 
+
+    function updateLiveBgPreview(newBgColor) {
+        if (!transparentBgFilename || !bgLivePreviewCanvas || !bgResultEl) {
+            if (!isInitialBgProcessDone && croppedFilename) { // Jika belum proses awal, lakukan proses standar
+                processBackgroundRemovalAndColor(croppedFilename, newBgColor, true);
+            }
+            return;
+        }
+        const imgTransparent = new Image();
+        imgTransparent.crossOrigin = "Anonymous"; 
+        imgTransparent.onload = () => {
+            bgLivePreviewCanvas.width = imgTransparent.naturalWidth;
+            bgLivePreviewCanvas.height = imgTransparent.naturalHeight;
+            const ctx = bgLivePreviewCanvas.getContext('2d');
+            if (!ctx) return;
+            ctx.fillStyle = newBgColor;
+            ctx.fillRect(0, 0, bgLivePreviewCanvas.width, bgLivePreviewCanvas.height);
+            ctx.drawImage(imgTransparent, 0, 0);
+            bgResultEl.src = bgLivePreviewCanvas.toDataURL('image/png');
+            bgResultEl.style.display = 'block';
+        };
+        imgTransparent.onerror = () => { showNotification("Gagal memuat gambar transparan untuk preview BG.", "error"); };
+        imgTransparent.src = `/static/uploads/${transparentBgFilename}?t=${new Date().getTime()}`;
+    }
+
+    if (bgColorInput) {
+        bgColorInput.addEventListener('input', (event) => { 
+            if (isInitialBgProcessDone) { updateLiveBgPreview(event.target.value); }
+        });
+    }
+
+    if (quickColorButtonsContainer) {
+        quickColorButtonsContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-color]');
+            if (button) {
+                const color = button.dataset.color;
+                if(bgColorInput) bgColorInput.value = color;
+                if (isInitialBgProcessDone) { updateLiveBgPreview(color); }
+            }
+        });
+    }
+    
+    function processBackgroundRemovalAndColor(filenameToProcess, bgColor, isLivePreviewTrigger = false) {
+        showSpinner('Memproses background...');
+        fetch("{{ url_for('process.remove_background_api') }}", {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: filenameToProcess, bgColor: bgColor })
+        })
+        .then(response => { 
+            hideSpinner();
+            if (!response.ok) {
+                response.json().then(errData => showNotification(`Proses BG Gagal: ${errData.error || response.statusText}`, 'error'))
+                            .catch(() => showNotification(`Proses BG Gagal: ${response.statusText}`, 'error'));
+                throw new Error(`Remove BG failed: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) { showNotification(data.error, 'error'); throw new Error(data.error); }
+            bgRemovedFilename = data.filename; 
+            transparentBgFilename = data.transparent_filename; 
+            finalFilenameForDownload = bgRemovedFilename;
+            const bgProcessedUrl = `${data.url}?t=${new Date().getTime()}`;
+            if(bgResultEl) { bgResultEl.src = bgProcessedUrl; bgResultEl.style.display = 'block';}
+            // outfitPreviewEl.src dihapus karena elemennya tidak ada lagi
+            showNotification('Background berhasil diproses!', 'success');
+            isInitialBgProcessDone = true; 
+            if (!isLivePreviewTrigger) { 
+                enableTab(4, true); // Sekarang tab 4 adalah Download
+            }
+        })
+        .catch(error => { 
+            hideSpinner(); console.error("Remove BG error:", error);
+        });
+    }
+
+    if(removeBgBtn) { 
+        removeBgBtn.addEventListener('click', () => {
+            const filenameToProcess = croppedFilename || uploadedFilename;
+            if (!filenameToProcess) { showNotification('Harap crop gambar terlebih dahulu.', 'error'); return; }
+            const bgColor = bgColorInput.value;
+            isInitialBgProcessDone = false; 
+            processBackgroundRemovalAndColor(filenameToProcess, bgColor);
+        });
+    }
+
+    // --- Logic untuk Outfit DIHAPUS ---
+
+    // --- 5. Download Logic ---
+    function updateDownloadLink() {
+        // Update finalFilenameForDownload sebelum memanggil fungsi ini jika perlu
+        // Atau, tentukan di sini berdasarkan langkah terakhir yang valid
+        if (bgRemovedFilename) {
+            finalFilenameForDownload = bgRemovedFilename;
+        } else if (croppedFilename) {
+            finalFilenameForDownload = croppedFilename;
+        } else {
+            finalFilenameForDownload = uploadedFilename;
+        }
+
+        if (finalFilenameForDownload) {
+            const downloadUrl = `{{ url_for('process.download_file', filename='__FILENAME__') }}`.replace('__FILENAME__', finalFilenameForDownload);
+            if(downloadBtn) downloadBtn.setAttribute('href', downloadUrl);
+            
+            const previewUrl = `/static/uploads/${finalFilenameForDownload}?t=${new Date().getTime()}`;
+            if(finalPreviewImageEl) {
+                 finalPreviewImageEl.src = previewUrl;
+                 finalPreviewImageEl.style.display = 'block';
+            }
+        } else {
+            if(downloadBtn) downloadBtn.setAttribute('href', '#');
+            if(finalPreviewImageEl) finalPreviewImageEl.style.display = 'none';
+        }
+    }
+    
+    // Tab Download sekarang adalah tabRadios[4]
+    if (tabRadios[4]) { 
+        tabRadios[4].addEventListener('change', function() {
+            if (this.checked) updateDownloadLink();
+        });
+    }
+
+    resetToUploadStep(); 
+});
+</script>
+{% endblock %}

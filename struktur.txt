@@ -1,0 +1,57 @@
+Folder PATH listing for volume Local Disk
+Volume serial number is 76D9-CA2A
+C:.
+¦   main.py
+¦   readme.md
+¦   requirements.txt
+¦   struktur.txt
+¦   
++---app
+¦   ¦   __init__.py
+¦   ¦   
+¦   +---routes
+¦   ¦   ¦   main.py
+¦   ¦   ¦   process.py
+¦   ¦   ¦   __init__.py
+¦   ¦   ¦   
+¦   ¦   +---__pycache__
+¦   ¦           main.cpython-312.pyc
+¦   ¦           process.cpython-312.pyc
+¦   ¦           __init__.cpython-312.pyc
+¦   ¦           
+¦   +---utils
+¦   +---__pycache__
+¦           _init_.cpython-312.pyc
+¦           __init__.cpython-312.pyc
+¦           
++---src
++---static
+¦   ¦   input.css
+¦   ¦   output.css
+¦   ¦   
+¦   +---css
+¦   ¦       footer.css
+¦   ¦       footer.css.map
+¦   ¦       styles.css
+¦   ¦       styles.css.map
+¦   ¦       
+¦   +---results
+¦   +---scss
+¦   ¦       footer.scss
+¦   ¦       
+¦   +---uploads
++---templates
+¦   ¦   index.jinja
+¦   ¦   pasfoto.jinja
+¦   ¦   pasfoto2.jinja
+¦   ¦   _base.jinja
+¦   ¦   _base2.jinja
+¦   ¦   
+¦   +---components
+¦           footer.html
+¦           navbar.html
+¦           
++---__pycache__
+        app.cpython-312.pyc
+        utils.cpython-312.pyc
+        

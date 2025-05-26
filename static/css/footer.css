@@ -1,7 +1,9 @@
 body {
-  overflow-x: hidden;
+  box-sizing: border-box;
+  overflow-x: hidden !important;
 }
 body .footer {
+  margin-top: 4rem;
   z-index: 1;
   --footer-background: #ed5565;
   display: grid;
@@ -30,7 +32,6 @@ body .footer .bubbles .bubble {
 body .footer .content {
   z-index: 2;
   display: grid;
-  grid-template-columns: auto auto auto auto;
   grid-gap: 4rem;
   padding: 2rem;
   width: 100%;
@@ -102,6 +103,24 @@ body .footer .content > div .image {
   }
   100% {
     bottom: var(--distance, 10rem);
+  }
+}
+@media (min-width: 641px) {
+  .content {
+    grid-template-columns: auto auto auto auto;
+  }
+}
+@media (max-width: 640px) {
+  .content {
+    grid-template-columns: auto auto;
+  }
+}
+@media (max-width: 300px) {
+  .footer {
+    overflow: hidden !important;
+  }
+  .content {
+    grid-template-columns: auto;
   }
 }
 

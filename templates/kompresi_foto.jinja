@@ -1,0 +1,148 @@
+{% extends '_base.jinja' %}
+{% block title %}Kompresi Foto - Potocraft{% endblock %}
+
+{% block content %}
+<div class="card w-full max-w-2xl bg-base-100 shadow-xl mx-auto">
+  <div class="card-body">
+    <h2 class="card-title text-2xl">Kompresi Foto</h2>
+    <p>Upload gambar untuk mengurangi ukuran filenya.</p>
+
+    <div class="form-control mt-4">
+      <label class="label" for="imageUploadCompress">
+        <span class="label-text">Pilih Gambar (JPG/PNG)</span>
+      </label>
+      <input type="file" id="imageUploadCompress" accept="image/jpeg,image/png" class="file-input file-input-bordered file-input-secondary w-full" />
+    </div>
+
+    <div class="form-control mt-4">
+      <label class="label" for="compressionQuality">
+        <span class="label-text">Kualitas Kompresi (1-100, hanya untuk JPG):</span>
+      </label>
+      <input type="range" id="compressionQuality" min="1" max="100" value="75" class="range range-secondary" />
+       <div class="w-full flex justify-between text-xs px-2">
+            <span>1</span>
+            <span id="qualityValue">75</span>
+            <span>100</span>
+        </div>
+      <p class="text-xs text-base-content/60 mt-1">Untuk PNG, kompresi lossless akan diterapkan.</p>
+    </div>
+
+
+    <div class="card-actions justify-end mt-6">
+      <button id="processCompressBtn" class="btn btn-secondary">Kompres Foto</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+      <div>
+        <h3 class="font-semibold mb-2">Gambar Asli:</h3>
+        <img id="originalPreviewCompress" src="#" alt="Preview Asli" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
+        <div id="originalPlaceholderCompress" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Asli</div>
+        <p id="originalSizeCompress" class="text-sm mt-1"></p>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Hasil Kompresi:</h3>
+        <img id="processedPreviewCompress" src="#" alt="Preview Hasil" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
+        <div id="processedPlaceholderCompress" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Hasil</div>
+        <p id="processedSizeCompress" class="text-sm mt-1"></p>
+        <a id="downloadCompressedBtn" class="btn btn-sm btn-link p-0" style="display:none;">Unduh Hasil Kompresi</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const imageUpload = document.getElementById('imageUploadCompress');
+    const originalPreview = document.getElementById('originalPreviewCompress');
+    const originalPlaceholder = document.getElementById('originalPlaceholderCompress');
+    const originalSizeDisplay = document.getElementById('originalSizeCompress');
+    const processedPreview = document.getElementById('processedPreviewCompress');
+    const processedPlaceholder = document.getElementById('processedPlaceholderCompress');
+    const processedSizeDisplay = document.getElementById('processedSizeCompress');
+    const qualitySlider = document.getElementById('compressionQuality');
+    const qualityValueDisplay = document.getElementById('qualityValue');
+    const processBtn = document.getElementById('processCompressBtn');
+    const downloadBtn = document.getElementById('downloadCompressedBtn');
+    let uploadedFile = null;
+
+    if(qualitySlider && qualityValueDisplay) {
+        qualitySlider.addEventListener('input', (event) => {
+            qualityValueDisplay.textContent = event.target.value;
+        });
+    }
+
+    imageUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            uploadedFile = file;
+            originalSizeDisplay.textContent = `Ukuran Asli: ${(file.size / 1024).toFixed(2)} KB`;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalPreview.src = e.target.result;
+                originalPreview.style.display = 'block';
+                originalPlaceholder.style.display = 'none';
+                processedPreview.style.display = 'none';
+                processedPlaceholder.style.display = 'block';
+                processedPreview.src = '#';
+                processedSizeDisplay.textContent = '';
+                downloadBtn.style.display = 'none';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    processBtn.addEventListener('click', () => {
+        if (!uploadedFile) {
+            alert('Silakan pilih gambar terlebih dahulu.');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+        formData.append('quality', qualitySlider.value);
+
+        processedPlaceholder.textContent = 'Memproses...';
+        processedPlaceholder.style.display = 'flex';
+        processedPreview.style.display = 'none';
+        downloadBtn.style.display = 'none';
+
+        fetch("{{ url_for('process.process_compress_photo') }}", { // Perlu route baru di process.py
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                 return response.json().then(err => { throw new Error(err.error || 'Gagal memproses gambar.')});
+            }
+            // Untuk kompresi, kita mungkin ingin mendapatkan file blob dan info ukurannya
+            // atau URL ke file yang sudah dikompresi di server
+            return response.json(); 
+        })
+        .then(data => {
+             if (data.url && data.filename) {
+                processedPreview.src = data.url + '?t=' + new Date().getTime();
+                processedPreview.style.display = 'block';
+                processedPlaceholder.style.display = 'none';
+                processedSizeDisplay.textContent = `Ukuran Hasil: ${(data.size_kb).toFixed(2)} KB (${data.compression_percent}% lebih kecil)`;
+                downloadBtn.href = data.url; // Atau link download khusus
+                downloadBtn.download = data.filename; // Nama file saat diunduh
+                downloadBtn.style.display = 'inline-block';
+            } else if (data.error) {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan: ' + error.message);
+            processedPlaceholder.textContent = 'Preview Hasil';
+            processedPlaceholder.style.display = 'flex';
+            processedPreview.style.display = 'none';
+            processedSizeDisplay.textContent = '';
+            downloadBtn.style.display = 'none';
+        });
+    });
+});
+</script>
+{% endblock %}
