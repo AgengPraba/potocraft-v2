@@ -436,8 +436,103 @@ def process_interactive_segmentation():
         current_app.logger.error(traceback.format_exc())
         return jsonify({'error': f'Terjadi kesalahan internal server: {str(e)}'}), 500
 
-    #===============photoboth=============
-    import base64 # Untuk decode data URL jika dikirim dari client
+@process_bp.route('/process-enhance-photo', methods=['POST'])
+def process_enhance_photo():
+    if 'image' not in request.files:
+        return jsonify({'error': 'Tidak ada file gambar'}), 400
+    
+    file = request.files['image']
+    enhancement_type = request.form.get('enhancement_type', 'sharpen')
+    enhancement_level = request.form.get('enhancement_level', '3')
+
+    if file.filename == '':
+        return jsonify({'error': 'Nama file kosong'}), 400
+
+    # --- AWAL LOGIKA PEMROSESAN (CONTOH DUMMY) ---
+    # Implementasikan logika peningkatan kualitas menggunakan Pillow (ImageEnhance)
+    # Contoh: ImageEnhance.Sharpness(img).enhance(float(enhancement_level))
+    try:
+        filename = secure_filename_custom(file.filename)
+        unique_filename = f"enhanced_{uuid.uuid4().hex}_{filename}"
+        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        # Contoh sederhana: simpan file asli saja untuk demo
+        # Anda perlu membuka gambar dengan Pillow, terapkan enhancement, lalu simpan
+        img = Image.open(file.stream)
+        if enhancement_type == 'sharpen':
+            enhancer = ImageEnhance.Sharpness(img)
+            # Level dari 1-5, perlu di-map ke faktor yang sesuai untuk Pillow
+            # Misal: level 1=1.0, 2=1.5, 3=2.0, 4=2.5, 5=3.0
+            factor = 1.0 + ( (float(enhancement_level) -1 ) * 0.5 ) 
+            img_enhanced = enhancer.enhance(factor)
+            img_enhanced.save(save_path)
+        else:
+            # Fitur lain (super_resolution, denoise) perlu implementasi lebih lanjut
+            file.save(save_path) # Simpan asli jika enhancement type belum diimplementasi
+
+        current_app.logger.info(f"Proses Enhance (type: {enhancement_type}, level: {enhancement_level}) untuk '{file.filename}'. Disimpan sebagai {unique_filename}")
+        processed_url = f"/static/uploads/{unique_filename}"
+        return jsonify({'url': processed_url, 'filename': unique_filename})
+    except Exception as e:
+        current_app.logger.error(f"Error dummy process_enhance_photo: {e}")
+        return jsonify({'error': str(e)}), 500
+    # --- AKHIR LOGIKA PEMROSESAN (CONTOH DUMMY) ---
+
+@process_bp.route('/process-compress-photo', methods=['POST'])
+def process_compress_photo():
+    if 'image' not in request.files:
+        return jsonify({'error': 'Tidak ada file gambar'}), 400
+    
+    file = request.files['image']
+    quality = int(request.form.get('quality', 75)) # Kualitas 1-100 untuk JPG
+
+    if file.filename == '':
+        return jsonify({'error': 'Nama file kosong'}), 400
+
+    # --- AWAL LOGIKA PEMROSESAN (CONTOH DUMMY) ---
+    # Implementasikan logika kompresi menggunakan Pillow
+    # img.save(path, quality=quality) untuk JPG
+    # img.save(path, optimize=True) untuk PNG
+    try:
+        filename = secure_filename_custom(file.filename)
+        original_name, ext = os.path.splitext(filename)
+        ext = ext.lower()
+
+        unique_filename = f"compressed_{uuid.uuid4().hex}_{original_name}{ext}"
+        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        img = Image.open(file.stream)
+        if ext == '.jpg' or ext == '.jpeg':
+            img.save(save_path, 'JPEG', quality=quality, optimize=True)
+        elif ext == '.png':
+            img.save(save_path, 'PNG', optimize=True)
+        else:
+            # Jika bukan jpg/png, simpan saja aslinya atau beri error
+             return jsonify({'error': 'Hanya JPG/PNG yang bisa dikompres dengan metode ini'}), 400
+        
+        compressed_size_bytes = os.path.getsize(save_path)
+        original_size_bytes = file.seek(0, os.SEEK_END) # Dapatkan ukuran file asli
+        file.seek(0) # Kembalikan pointer file
+
+        compression_percent = 0
+        if original_size_bytes > 0:
+            compression_percent = round((1 - (compressed_size_bytes / original_size_bytes)) * 100, 2)
+
+
+        current_app.logger.info(f"Proses Kompresi (kualitas: {quality if ext=='.jpg' or ext=='.jpeg' else 'N/A'}) untuk '{file.filename}'. Disimpan sebagai {unique_filename}")
+        processed_url = f"/static/uploads/{unique_filename}"
+        return jsonify({
+            'url': processed_url, 
+            'filename': unique_filename,
+            'size_kb': compressed_size_bytes / 1024,
+            'compression_percent': compression_percent
+            })
+    except Exception as e:
+        current_app.logger.error(f"Error dummy process_compress_photo: {e}")
+        return jsonify({'error': str(e)}), 500  
+
+#===============photoboth=============
+import base64 # Untuk decode data URL jika dikirim dari client
 
 @process_bp.route('/save-photobooth-image', methods=['POST'])
 def save_photobooth_image():
