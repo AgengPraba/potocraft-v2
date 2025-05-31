@@ -4,52 +4,282 @@
 {% block styles %}
 {{ super() }}
 <style>
-  #webcamFeed, #capturedImagePreview {
-    width: 100%;
-    max-width: 640px; /* Sesuaikan ukuran maksimum video/gambar */
-    height: auto;
-    border: 2px solid hsl(var(--b3)); /* Border dari DaisyUI */
-    background-color: hsl(var(--b2)); /* Background netral */
-    border-radius: var(--rounded-box, 1rem); /* Menggunakan variabel radius dari DaisyUI */
-    margin: 1rem auto;
-    display: block;
-  }
-  #captureCanvas {
-    display: none; /* Canvas digunakan di background, tidak perlu terlihat */
-  }
-  .photobooth-controls {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
-  }
+    /* Global styles for video and captured image */
+    #webcamFeed {
+        width: 100%;
+        max-width: 640px; /* Max width for video feed */
+        height: auto;
+        border: 2px solid hsl(var(--b3));
+        background-color: hsl(var(--b2));
+        border-radius: var(--rounded-box, 1rem);
+        margin: 1rem auto;
+        display: block;
+        object-fit: cover; /* Ensures video fills container without distortion */
+        transform: scaleX(-1); /* Mirror effect for webcam */
+        /* Filter styles will be applied dynamically here */
+    }
+
+    #captureCanvas, #finalLayoutPreview {
+        display: none; /* Canvases are used in the background or hidden initially */
+    }
+
+    .photobooth-controls, .layout-selection, .filter-selection, .frame-selection {
+        display: flex;
+        flex-wrap: wrap; /* Allow wrapping on small screens */
+        justify-content: center;
+        gap: 0.75rem; /* Slightly reduced gap */
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    /* --- Layout Selection Styling --- */
+    .layout-selection .layout-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.5rem;
+        border: 2px solid transparent; /* Default border */
+        border-radius: var(--rounded-btn, 0.5rem);
+        cursor: pointer;
+        background-color: hsl(var(--b2)); /* Background for options */
+        transition: all 0.2s ease-in-out;
+    }
+
+    .layout-selection .layout-option:hover {
+        border-color: hsl(var(--s)); /* Secondary color on hover */
+    }
+
+    .layout-selection .layout-option.active {
+        border-color: hsl(var(--p)); /* Primary color when active */
+        background-color: hsl(var(--p) / 0.1); /* Light primary background for active */
+    }
+
+    .layout-selection .layout-option svg {
+        width: 40px; /* Size of the SVG icon */
+        height: 40px;
+        border: 1px solid hsl(var(--bc)); /* Border for the overall layout preview */
+        background-color: hsl(var(--b3)); /* Background for slots */
+        margin-bottom: 0.25rem;
+    }
+
+    .layout-selection .layout-option svg rect {
+        fill: hsl(var(--b3)); /* Fill color for empty slots */
+        stroke: hsl(var(--bc) / 0.5); /* Border for individual slots */
+        stroke-width: 0.5;
+    }
+
+    /* Specific SVG styles for layout visualization (adjusted for square slots) */
+    /* Note: These SVG styles are for visualization only, the actual drawing on canvas
+        is handled by the JavaScript's layoutConfigs. */
+    .layout-3-vertical-svg rect:nth-child(1) { x: 5%; y: 5%; width: 90%; height: 28%; }
+    .layout-3-vertical-svg rect:nth-child(2) { x: 5%; y: 36%; width: 90%; height: 28%; }
+    .layout-3-vertical-svg rect:nth-child(3) { x: 5%; y: 67%; width: 90%; height: 28%; }
+
+    .layout-4-grid-svg rect:nth-child(1) { x: 5%; y: 5%; width: 42%; height: 42%; }
+    .layout-4-grid-svg rect:nth-child(2) { x: 53%; y: 5%; width: 42%; height: 42%; }
+    .layout-4-grid-svg rect:nth-child(3) { x: 5%; y: 53%; width: 42%; height: 42%; }
+    .layout-4-grid-svg rect:nth-child(4) { x: 53%; y: 53%; width: 42%; height: 42%; }
+
+    .layout-6-horizontal-svg rect:nth-child(1) { x: 5%; y: 5%; width: 28%; height: 42%; }
+    .layout-6-horizontal-svg rect:nth-child(2) { x: 36%; y: 5%; width: 28%; height: 42%; }
+    .layout-6-horizontal-svg rect:nth-child(3) { x: 67%; y: 5%; width: 28%; height: 42%; }
+    .layout-6-horizontal-svg rect:nth-child(4) { x: 5%; y: 53%; width: 28%; height: 42%; }
+    .layout-6-horizontal-svg rect:nth-child(5) { x: 36%; y: 53%; width: 28%; height: 42%; }
+    .layout-6-horizontal-svg rect:nth-child(6) { x: 67%; y: 53%; width: 28%; height: 42%; }
+
+    .layout-2-horizontal-svg rect:nth-child(1) { x: 5%; y: 5%; width: 42%; height: 90%; }
+    .layout-2-horizontal-svg rect:nth-child(2) { x: 53%; y: 5%; width: 42%; height: 90%; }
+
+    .layout-5-custom-svg rect:nth-child(1) { x: 5%; y: 5%; width: 90%; height: 45%; } /* Large top */
+    .layout-5-custom-svg rect:nth-child(2) { x: 5%; y: 55%; width: 22%; height: 40%; }
+    .layout-5-custom-svg rect:nth-child(3) { x: 28%; y: 55%; width: 22%; height: 40%; }
+    .layout-5-custom-svg rect:nth-child(4) { x: 51%; y: 55%; width: 22%; height: 40%; }
+    .layout-5-custom-svg rect:nth-child(5) { x: 74%; y: 55%; width: 22%; height: 40%; }
+
+    .layout-9-grid-svg rect { /* All 9 small squares */
+        width: calc(100% / 3 - 5%);
+        height: calc(100% / 3 - 5%);
+        margin: 2.5%;
+    }
+    .layout-9-grid-svg rect:nth-child(1) { x: 2.5%; y: 2.5%; }
+    .layout-9-grid-svg rect:nth-child(2) { x: 35%; y: 2.5%; }
+    .layout-9-grid-svg rect:nth-child(3) { x: 67.5%; y: 2.5%; }
+    .layout-9-grid-svg rect:nth-child(4) { x: 2.5%; y: 35%; }
+    .layout-9-grid-svg rect:nth-child(5) { x: 35%; y: 35%; }
+    .layout-9-grid-svg rect:nth-child(6) { x: 67.5%; y: 35%; }
+    .layout-9-grid-svg rect:nth-child(7) { x: 2.5%; y: 67.5%; }
+    .layout-9-grid-svg rect:nth-child(8) { x: 35%; y: 67.5%; }
+    .layout-9-grid-svg rect:nth-child(9) { x: 67.5%; y: 67.5%; }
+
+
+    /* --- Filter Selection Styling --- */
+    .filter-selection .filter-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.5rem 0.75rem; /* Adjust padding for button look */
+        border-radius: var(--rounded-btn, 0.5rem);
+        transition: all 0.2s ease-in-out;
+    }
+    .filter-selection .filter-btn.active {
+        background-color: hsl(var(--in) / 0.1); /* Info color for active filter */
+        border-color: hsl(var(--in));
+    }
+    /* Filter class for video element */
+    .filter-none { filter: none; }
+    .filter-grayscale { filter: grayscale(100%); }
+    .filter-sepia { filter: sepia(100%); }
+    .filter-invert { filter: invert(100%); }
+    .filter-contrast { filter: contrast(200%); } /* Strong contrast for example */
+    .filter-saturate { filter: saturate(200%); } /* High saturation */
+    .filter-brightness { filter: brightness(150%); } /* Brighter */
+
+    /* --- Frame Selection Styling --- */
+    .frame-selection .frame-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--rounded-btn, 0.5rem);
+        transition: all 0.2s ease-in-out;
+    }
+    .frame-selection .frame-btn.active {
+        background-color: hsl(var(--su) / 0.1); /* Success color for active frame */
+        border-color: hsl(var(--su));
+    }
+
+
+    /* Result Preview (Canvas) */
+    #finalLayoutPreview {
+        width: 100%;
+        max-width: 600px; /* Fixed max width for the square result */
+        aspect-ratio: 1 / 1; /* Always square */
+        height: auto;
+        display: block;
+        margin: 1rem auto;
+        border: 2px solid hsl(var(--b3));
+        border-radius: var(--rounded-box, 1rem);
+        background-color: hsl(var(--b2)); /* Ensure background is visible if no image */
+    }
+
+    #finalPlaceholder {
+        width: 100%;
+        max-width: 600px; /* Match finalLayoutPreview max-width */
+        aspect-ratio: 1 / 1; /* Always square */
+        height: auto;
+        border-radius: var(--rounded-box, 1rem);
+        background-color: hsl(var(--b3));
+        min-height: 200px; /* Ensure it's visible when empty */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: hsl(var(--bc) / 0.5);
+        margin: 1rem auto;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="card w-full max-w-3xl bg-base-100 shadow-xl mx-auto">
-  <div class="card-body items-center text-center">
-    <h2 class="card-title text-2xl">Photobooth Potocraft!</h2>
-    <p class="mb-4">Senyum dan ambil foto Anda!</p>
+<div class="card w-full max-w-4xl bg-base-100 shadow-xl mx-auto">
+    <div class="card-body items-center text-center">
+        <h2 class="card-title text-2xl">Photobooth Potocraft!</h2>
+        <p class="mb-4">Senyum dan ambil foto Anda sesuai layout pilihan!</p>
 
-    <div class="w-full">
-      <video id="webcamFeed" autoplay playsinline></video>
-      <canvas id="captureCanvas"></canvas> </div>
+        <div class="layout-selection">
+            <span class="label-text text-lg font-semibold mr-2">Pilih Layout:</span>
 
-    <div class="photobooth-controls">
-      <button id="startWebcamBtn" class="btn btn-secondary">Mulai Kamera</button>
-      <button id="captureBtn" class="btn btn-primary" disabled>Ambil Foto!</button>
+            <button class="layout-option" data-layout="3-vertical">
+                <svg viewBox="0 0 100 100" class="layout-3-vertical-svg">
+                    <rect x="0" y="0" width="100" height="100" fill="transparent"/>
+                    <rect/> <rect/> <rect/>
+                </svg>
+                <span>3 Foto Vertikal</span>
+            </button>
+
+            <button class="layout-option" data-layout="4-grid">
+                <svg viewBox="0 0 100 100" class="layout-4-grid-svg">
+                    <rect x="0" y="0" width="100" height="100" fill="transparent"/>
+                    <rect/> <rect/> <rect/> <rect/>
+                </svg>
+                <span>4 Foto Kotak</span>
+            </button>
+
+            <button class="layout-option" data-layout="6-horizontal">
+                <svg viewBox="0 0 100 100" class="layout-6-horizontal-svg">
+                    <rect x="0" y="0" width="100" height="100" fill="transparent"/>
+                    <rect/> <rect/> <rect/> <rect/> <rect/> <rect/>
+                </svg>
+                <span>6 Foto Horizontal</span>
+            </button>
+
+            <button class="layout-option" data-layout="2-horizontal">
+                <svg viewBox="0 0 100 100" class="layout-2-horizontal-svg">
+                    <rect x="0" y="0" width="100" height="100" fill="transparent"/>
+                    <rect/> <rect/>
+                </svg>
+                <span>2 Foto Horizontal</span>
+            </button>
+
+            <button class="layout-option" data-layout="5-custom">
+                <svg viewBox="0 0 100 100" class="layout-5-custom-svg">
+                    <rect x="0" y="0" width="100" height="100" fill="transparent"/>
+                    <rect/> <rect/> <rect/> <rect/> <rect/>
+                </svg>
+                <span>5 Foto Custom</span>
+            </button>
+
+            <button class="layout-option" data-layout="9-grid">
+                <svg viewBox="0 0 100 100" class="layout-9-grid-svg">
+                    <rect x="0" y="0" width="100" height="100" fill="transparent"/>
+                    <rect/> <rect/> <rect/> <rect/> <rect/> <rect/> <rect/> <rect/> <rect/>
+                </svg>
+                <span>9 Foto Kotak</span>
+            </button>
+        </div>
+
+        <div class="w-full">
+            <video id="webcamFeed" autoplay playsinline></video>
+            <canvas id="captureCanvas"></canvas>
+        </div>
+        
+        <div class="filter-selection">
+            <span class="label-text text-lg font-semibold mr-2">Pilih Filter:</span>
+            <button class="btn btn-sm btn-outline btn-info filter-btn active" data-filter="none">Normal</button>
+            <button class="btn btn-sm btn-outline btn-info filter-btn" data-filter="grayscale">B&W</button>
+            <button class="btn btn-sm btn-outline btn-info filter-btn" data-filter="sepia">Sepia</button>
+            <button class="btn btn-sm btn-outline btn-info filter-btn" data-filter="invert">Invert</button>
+            <button class="btn btn-sm btn-outline btn-info filter-btn" data-filter="contrast">Kontras</button>
+            <button class="btn btn-sm btn-outline btn-info filter-btn" data-filter="saturate">Saturasi</button>
+            <button class="btn btn-sm btn-outline btn-info filter-btn" data-filter="brightness">Cerah</button>
+        </div>
+
+        <div class="frame-selection">
+            <span class="label-text text-lg font-semibold mr-2">Pilih Bingkai:</span>
+            <button class="btn btn-sm btn-outline btn-success frame-btn active" data-frame="none">Tanpa Bingkai</button>
+            <button class="btn btn-sm btn-outline btn-success frame-btn" data-frame="black">Bingkai Hitam</button>
+            <button class="btn btn-sm btn-outline btn-success frame-btn" data-frame="primary-color">Bingkai Warna Primer</button>
+            <button class="btn btn-sm btn-outline btn-success frame-btn" data-frame="blue-dashed">Bingkai Biru Putus</button>
+            <button class="btn btn-sm btn-outline btn-success frame-btn" data-frame="red-thick">Bingkai Merah Tebal</button>
+            <button class="btn btn-sm btn-outline btn-success frame-btn" data-frame="green-double">Bingkai Hijau Ganda</button>
+            <button class="btn btn-sm btn-outline btn-success frame-btn" data-frame="yellow-shadow">Bingkai Kuning Bayangan</button>
+        </div>
+        <div class="photobooth-controls">
+            <button id="startWebcamBtn" class="btn btn-secondary">Mulai Kamera</button>
+            <button id="captureBtn" class="btn btn-primary" disabled>Ambil Foto! (0/X)</button>
+            <button id="resetBtn" class="btn btn-ghost" style="display: none;">Reset</button>
+        </div>
+
+        <div class="mt-4 w-full">
+            <h3 class="font-semibold mb-2 text-lg">Hasil Foto:</h3>
+            <canvas id="finalLayoutPreview"></canvas>
+            <div id="finalPlaceholder">Pilih Layout dan Mulai Kamera</div>
+            <a id="downloadPhotoBtn" class="btn btn-accent mt-4" style="display:none;">Unduh Foto</a>
+        </div>
+
     </div>
-
-    <div class="mt-4 w-full">
-      <h3 class="font-semibold mb-2 text-lg">Hasil Foto:</h3>
-      <img id="capturedImagePreview" src="#" alt="Hasil Foto yang Diambil" style="display:none;" />
-      <div id="capturedPlaceholder" class="w-full max-w-md rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50 mx-auto">Preview Foto</div>
-      <a id="downloadPhotoBtn" class="btn btn-accent mt-4" style="display:none;">Unduh Foto</a>
-    </div>
-
-  </div>
 </div>
 {% endblock %}
 
@@ -57,34 +287,306 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Elemen HTML ---
     const videoElement = document.getElementById('webcamFeed');
-    const canvasElement = document.getElementById('captureCanvas');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const finalLayoutPreview = document.getElementById('finalLayoutPreview'); // Canvas untuk hasil akhir
+    const finalLayoutContext = finalLayoutPreview.getContext('2d');
+    const finalPlaceholder = document.getElementById('finalPlaceholder');
     const captureBtn = document.getElementById('captureBtn');
     const startWebcamBtn = document.getElementById('startWebcamBtn');
-    const capturedImagePreview = document.getElementById('capturedImagePreview');
-    const capturedPlaceholder = document.getElementById('capturedPlaceholder');
+    const resetBtn = document.getElementById('resetBtn');
     const downloadPhotoBtn = document.getElementById('downloadPhotoBtn');
-    let stream = null;
+
+    const layoutOptionBtns = document.querySelectorAll('.layout-selection .layout-option');
+    const filterSelectionBtns = document.querySelectorAll('.filter-selection .filter-btn');
+    const frameSelectionBtns = document.querySelectorAll('.frame-selection .frame-btn'); // NEW: Frame buttons
+
+    // --- State Aplikasi ---
+    let stream = null; // Untuk stream webcam
+    let currentLayout = null; // Menyimpan layout yang dipilih (e.g., '3-vertical', '4-grid')
+    let photosTakenData = []; // Array untuk menyimpan DataURL setiap foto yang diambil
+    let photosTakenCount = 0; // Counter foto yang sudah diambil
+    let currentFilter = 'none'; // Filter aktif saat ini
+    let currentFrame = 'none'; // NEW: Frame aktif saat ini (inisialisasi default)
+
+    // --- Konfigurasi Layout (PENTING: Semua layout akan digambar ke canvas persegi) ---
+    // drawPositions: (canvasSize) => [...] akan menerima satu argumen (sisi canvas persegi)
+    const layoutConfigs = {
+        '3-vertical': {
+            slots: 3,
+            // Koordinat relatif untuk digambar di canvas persegi
+            drawPositions: (size) => {
+                const margin = size * 0.05; // 5% margin dari total canvas
+                const spaceBetween = size * 0.03; // 3% ruang antar foto
+                
+                const availableHeightForPhotos = size - (2 * margin) - (2 * spaceBetween);
+                const slotSize = availableHeightForPhotos / 3; // Karena ada 3 slot vertikal
+
+                // Pusatkan persegi secara horizontal di tengah canvas
+                const startX = (size - slotSize) / 2;
+
+                return [
+                    { x: startX, y: margin, width: slotSize, height: slotSize },
+                    { x: startX, y: margin + slotSize + spaceBetween, width: slotSize, height: slotSize },
+                    { x: startX, y: margin + (2 * (slotSize + spaceBetween)), width: slotSize, height: slotSize }
+                ];
+            }
+        },
+        '4-grid': {
+            slots: 4,
+            drawPositions: (size) => {
+                const margin = size * 0.05;
+                const spaceBetween = size * 0.03; // Ruang antar grid items
+                const slotSize = (size - (2 * margin) - spaceBetween) / 2; // Ukuran untuk grid 2x2
+
+                return [
+                    { x: margin, y: margin, width: slotSize, height: slotSize },
+                    { x: margin + slotSize + spaceBetween, y: margin, width: slotSize, height: slotSize },
+                    { x: margin, y: margin + slotSize + spaceBetween, width: slotSize, height: slotSize },
+                    { x: margin + slotSize + spaceBetween, y: margin + slotSize + spaceBetween, width: slotSize, height: slotSize }
+                ];
+            }
+        },
+        '6-horizontal': {
+            slots: 6,
+            drawPositions: (size) => {
+                const margin = size * 0.05;
+                const spaceBetweenX = size * 0.02; // Sedikit lebih kecil agar lebih rapat horizontal
+                const spaceBetweenY = size * 0.03;
+
+                // Hitung ukuran maksimal untuk 3 kolom
+                const availableWidthForSlots = size - (2 * margin) - (2 * spaceBetweenX);
+                const maxSlotWidth = availableWidthForSlots / 3;
+
+                // Hitung ukuran maksimal untuk 2 baris
+                const availableHeightForSlots = size - (2 * margin) - spaceBetweenY;
+                const maxSlotHeight = availableHeightForSlots / 2;
+
+                // Gunakan ukuran yang lebih kecil untuk memastikan foto persegi pas di kedua dimensi
+                const squareSize = Math.min(maxSlotWidth, maxSlotHeight);
+
+                return [
+                    { x: margin, y: margin, width: squareSize, height: squareSize },
+                    { x: margin + squareSize + spaceBetweenX, y: margin, width: squareSize, height: squareSize },
+                    { x: margin + (2 * (squareSize + spaceBetweenX)), y: margin, width: squareSize, height: squareSize },
+                    { x: margin, y: margin + squareSize + spaceBetweenY, width: squareSize, height: squareSize },
+                    { x: margin + squareSize + spaceBetweenX, y: margin + squareSize + spaceBetweenY, width: squareSize, height: squareSize },
+                    { x: margin + (2 * (squareSize + spaceBetweenX)), y: margin + squareSize + spaceBetweenY, width: squareSize, height: squareSize }
+                ];
+            }
+        },
+        '2-horizontal': {
+            slots: 2,
+            drawPositions: (size) => {
+                const margin = size * 0.05;
+                const spaceBetween = size * 0.03;
+                
+                const availableWidthForPhotos = size - (2 * margin) - spaceBetween;
+                const slotSize = availableWidthForPhotos / 2; // Ukuran untuk 2 slot horizontal
+
+                // Pusatkan persegi secara vertikal di tengah canvas
+                const startY = (size - slotSize) / 2;
+
+                return [
+                    { x: margin, y: startY, width: slotSize, height: slotSize },
+                    { x: margin + slotSize + spaceBetween, y: startY, width: slotSize, height: slotSize }
+                ];
+            }
+        },
+        '5-custom': { // 1 besar di atas, 4 kecil di bawah
+            slots: 5,
+            drawPositions: (size) => {
+                const margin = size * 0.05;
+                const spaceBetween = size * 0.02; // Ruang antar foto
+
+                // Foto besar di atas
+                const largeSlotWidth = size - (2 * margin);
+                // Ambil tinggi yang tersedia untuk bagian atas, lalu buat persegi dari yang terkecil
+                const availableHeightTop = (size * 0.5) - (1.5 * spaceBetween); // Kira-kira setengah tinggi canvas dikurangi ruang
+                const largeSquareSize = Math.min(largeSlotWidth, availableHeightTop);
+                const largeSlotX = (size - largeSquareSize) / 2; // Pusatkan
+                const largeSlotY = margin;
+
+                // Foto-foto kecil di bawah (4 buah)
+                const availableWidthBottom = size - (2 * margin) - (3 * spaceBetween);
+                const smallSlotSize = availableWidthBottom / 4;
+                
+                const smallSlotY = largeSlotY + largeSquareSize + spaceBetween;
+
+
+                return [
+                    { x: largeSlotX, y: largeSlotY, width: largeSquareSize, height: largeSquareSize }, // Large top, now square
+                    { x: margin, y: smallSlotY, width: smallSlotSize, height: smallSlotSize },
+                    { x: margin + smallSlotSize + spaceBetween, y: smallSlotY, width: smallSlotSize, height: smallSlotSize },
+                    { x: margin + (2 * (smallSlotSize + spaceBetween)), y: smallSlotY, width: smallSlotSize, height: smallSlotSize },
+                    { x: margin + (3 * (smallSlotSize + spaceBetween)), y: smallSlotY, width: smallSlotSize, height: smallSlotSize }
+                ];
+            }
+        },
+        '9-grid': {
+            slots: 9,
+            drawPositions: (size) => {
+                const positions = [];
+                const margin = size * 0.025; // 2.5% margin dari total canvas
+                // Hitung ukuran slot agar pas 3x3 dengan margin di antara dan di tepi
+                const slotSize = (size - (4 * margin)) / 3; // (ukuran total - (jumlah margin * margin size)) / jumlah slot per baris/kolom
+
+                for (let row = 0; row < 3; row++) {
+                    for (let col = 0; col < 3; col++) {
+                        positions.push({
+                            x: margin + col * (slotSize + margin),
+                            y: margin + row * (slotSize + margin),
+                            width: slotSize,
+                            height: slotSize
+                        });
+                    }
+                }
+                return positions;
+            }
+        }
+    };
+
+
+    // --- Fungsi Bantuan ---
+
+    function showNotification(message, type = 'info') {
+        const notificationContainer = document.createElement('div');
+        const alertClass = type === 'success' ? 'alert-success' : type === 'warning' ? 'alert-warning' : type === 'error' ? 'alert-error' : 'alert-info';
+        notificationContainer.className = `alert ${alertClass} fixed top-4 left-1/2 -translate-x-1/2 z-50 w-auto shadow-lg px-6 py-3 rounded-lg flex items-center space-x-2`;
+        notificationContainer.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                ${type === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />' : ''}
+                ${type === 'warning' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.02 6.002v3.001m0 4.001h.01m-6.91 6.908a9 9 0 1113.82 0l-3.46 3.46c-.53.53-1.38-.53-1.91 0L3.11 19.01a9 9 0 010-13.82z" />' : ''}
+                ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />' : ''}
+                ${type === 'info' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' : ''}
+            </svg>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(notificationContainer);
+
+        setTimeout(() => {
+            notificationContainer.remove();
+        }, 3000); // Hapus notifikasi setelah 3 detik
+    }
+
+
+    function updateCaptureButtonText() {
+        if (currentLayout) {
+            captureBtn.textContent = `Ambil Foto! (${photosTakenCount}/${layoutConfigs?.[currentLayout]?.slots ?? 'X'})`;
+        } else {
+            captureBtn.textContent = `Ambil Foto! (Pilih Layout)`;
+        }
+    }
+
+    function resetPhotobooth() {
+        if (stream) { // Hentikan stream kamera jika aktif
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        videoElement.srcObject = null; // Hentikan video feed
+        videoElement.style.display = 'block'; // Pastikan video feed utama terlihat
+        videoElement.classList.remove(...Array.from(videoElement.classList).filter(c => c.startsWith('filter-'))); // Bersihkan filter
+
+        // Reset state layout & foto
+        currentLayout = null;
+        photosTakenData = [];
+        photosTakenCount = 0;
+        updateCaptureButtonText();
+        
+        // Reset UI
+        captureBtn.disabled = true;
+        startWebcamBtn.textContent = 'Mulai Kamera';
+        resetBtn.style.display = 'none';
+
+        // Sembunyikan canvas hasil dan tampilkan placeholder
+        finalLayoutPreview.style.display = 'none';
+        finalPlaceholder.style.display = 'flex';
+        finalPlaceholder.textContent = 'Pilih Layout dan Mulai Kamera'; // Reset placeholder text
+        downloadPhotoBtn.style.display = 'none';
+        
+        // Clear canvas
+        finalLayoutContext.clearRect(0, 0, finalLayoutPreview.width, finalLayoutPreview.height);
+
+        // Reset filter selection visual
+        filterSelectionBtns.forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.filter-btn[data-filter="none"]').classList.add('active');
+        currentFilter = 'none';
+
+        // Reset frame selection visual
+        frameSelectionBtns.forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.frame-btn[data-frame="none"]').classList.add('active');
+        currentFrame = 'none'; // Reset frame aktif
+    }
+
+
+    // --- Fungsi Utama ---
 
     async function startWebcam() {
+        if (!currentLayout) {
+            showNotification('Silakan pilih layout terlebih dahulu.', 'warning');
+            return;
+        }
+
         try {
             if (stream) { // Hentikan stream lama jika ada
                 stream.getTracks().forEach(track => track.stop());
             }
+            // Minta akses kamera pengguna
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
             videoElement.srcObject = stream;
+            
+            // Tidak perlu mengatur aspect ratio videoElement karena final output selalu persegi
+            // Cukup pastikan webcam feed terlihat dengan baik
+
             captureBtn.disabled = false;
             startWebcamBtn.textContent = 'Ganti/Restart Kamera';
+            resetBtn.style.display = 'inline-flex';
             showNotification('Kamera berhasil diaktifkan!', 'success');
-            capturedImagePreview.style.display = 'none';
-            capturedPlaceholder.style.display = 'flex';
+
+            // Sembunyikan placeholder hasil dan reset pratinjau hasil
+            finalLayoutPreview.style.display = 'none';
+            finalPlaceholder.style.display = 'flex';
+            finalPlaceholder.textContent = 'Ambil foto pertama Anda!';
             downloadPhotoBtn.style.display = 'none';
+            finalLayoutContext.clearRect(0, 0, finalLayoutPreview.width, finalLayoutPreview.height);
 
         } catch (err) {
-            console.error("Error mengakses webcam: ", err);
-            showNotification(`Tidak bisa mengakses kamera: ${err.message}`, 'error');
+            console.error("Error accessing webcam: ", err);
+            showNotification(`Tidak bisa mengakses kamera: ${err.name} - ${err.message}`, 'error'); // Lebih detail error
             captureBtn.disabled = true;
             startWebcamBtn.textContent = 'Coba Lagi Kamera';
+            resetBtn.style.display = 'none';
+        }
+    }
+
+    // Fungsi untuk menerapkan filter ke konteks canvas
+    function applyFilterToContext(context, filterName) {
+        context.filter = 'none'; // Reset filter sebelumnya
+        
+        switch (filterName) {
+            case 'grayscale':
+                context.filter = 'grayscale(100%)';
+                break;
+            case 'sepia':
+                context.filter = 'sepia(100%)';
+                break;
+            case 'invert':
+                context.filter = 'invert(100%)';
+                break;
+            case 'contrast':
+                context.filter = 'contrast(200%);'; // Strong contrast for example
+                break;
+            case 'saturate':
+                context.filter = 'saturate(200%);'; // High saturation
+                break;
+            case 'brightness':
+                context.filter = 'brightness(150%);'; // Brighter
+                break;
+            case 'none':
+            default:
+                context.filter = 'none';
+                break;
         }
     }
 
@@ -93,39 +595,306 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Stream kamera tidak aktif. Mulai kamera terlebih dahulu.', 'warning');
             return;
         }
-        const context = canvasElement.getContext('2d');
-        // Set ukuran canvas sesuai dengan ukuran video actual
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
+        if (!currentLayout) {
+            showNotification('Pilih layout terlebih dahulu.', 'warning');
+            return;
+        }
+        if (photosTakenCount >= layoutConfigs[currentLayout].slots) {
+            showNotification('Semua slot foto sudah terisi!', 'info');
+            return;
+        }
+
+        // Flash effect (opsional, untuk memberikan feedback visual)
+        videoElement.style.filter = 'brightness(200%)';
+        setTimeout(() => {
+            videoElement.style.filter = ''; // Hapus filter setelah flash
+            // Pastikan filter asli dari currentFilter diterapkan kembali
+            if (currentFilter !== 'none') {
+                videoElement.classList.add(`filter-${currentFilter}`);
+            }
+        }, 100);
+
+
+        const context = captureCanvas.getContext('2d');
+        
+        // Pastikan captureCanvas memiliki dimensi yang sama dengan video feed untuk menangkap frame asli
+        captureCanvas.width = videoElement.videoWidth;
+        captureCanvas.height = videoElement.videoHeight;
+        
+        // Terapkan filter ke konteks canvas sebelum menggambar
+        applyFilterToContext(context, currentFilter);
         
         // Gambar frame video saat ini ke canvas
-        context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        context.drawImage(videoElement, 0, 0, captureCanvas.width, captureCanvas.height);
         
-        // Dapatkan data URL dari canvas
-        const dataUrl = canvasElement.toDataURL('image/png');
-        
-        // Tampilkan di preview
-        capturedImagePreview.src = dataUrl;
-        capturedImagePreview.style.display = 'block';
-        capturedPlaceholder.style.display = 'none';
-        
-        // Siapkan tombol download
-        downloadPhotoBtn.href = dataUrl;
-        downloadPhotoBtn.download = `photobooth_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}.png`;
-        downloadPhotoBtn.style.display = 'inline-flex'; // atau 'block'
+        // Reset filter pada konteks canvas agar tidak mempengaruhi gambar selanjutnya
+        context.filter = 'none'; // Penting: reset filter setelah menggambar!
 
-        showNotification('Foto berhasil diambil!', 'success');
+        // Dapatkan data URL dari canvas
+        const dataUrl = captureCanvas.toDataURL('image/png');
+        photosTakenData.push(dataUrl);
+        photosTakenCount++;
+        updateCaptureButtonText();
+
+        showNotification(`Foto ${photosTakenCount} berhasil diambil!`, 'success');
+        
+        // Langsung tampilkan foto yang diambil di finalLayoutPreview (sbg preview real-time)
+        drawFinalLayoutPreview();
+
+        if (photosTakenCount === layoutConfigs[currentLayout].slots) {
+            captureBtn.disabled = true;
+            showNotification('Semua foto untuk layout ini sudah diambil! Siap untuk diunduh.', 'info');
+            downloadPhotoBtn.style.display = 'inline-flex';
+            // Opsional: Hentikan stream kamera untuk menghemat daya setelah semua foto diambil
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                videoElement.style.display = 'none'; // Sembunyikan video feed
+            }
+        }
     }
+
+    // Fungsi untuk mendapatkan warna primer dari variabel CSS
+    function getPrimaryColor() {
+        const tempDiv = document.createElement('div');
+        tempDiv.style.setProperty('background-color', 'hsl(var(--p))');
+        document.body.appendChild(tempDiv);
+        const primaryColor = window.getComputedStyle(tempDiv).backgroundColor;
+        document.body.removeChild(tempDiv);
+        return primaryColor;
+    }
+
+    function drawFinalLayoutPreview() {
+        const config = layoutConfigs[currentLayout];
+        if (!config) {
+            finalLayoutPreview.style.display = 'none';
+            finalPlaceholder.style.display = 'flex';
+            return;
+        }
+
+        // Tentukan ukuran finalLayoutCanvas selalu persegi
+        const finalCanvasSize = 600; // Ukuran sisi persegi dalam piksel (bisa disesuaikan)
+        finalLayoutPreview.width = finalCanvasSize;
+        finalLayoutPreview.height = finalCanvasSize;
+
+        finalLayoutContext.clearRect(0, 0, finalCanvasSize, finalCanvasSize);
+        finalLayoutContext.fillStyle = 'white'; // Background putih untuk layout
+        finalLayoutContext.fillRect(0, 0, finalCanvasSize, finalCanvasSize);
+
+        finalPlaceholder.style.display = 'none';
+        finalLayoutPreview.style.display = 'block';
+
+        // Dapatkan posisi slot berdasarkan ukuran canvas persegi
+        const positions = config.drawPositions(finalCanvasSize);
+
+        // Draw photos if available, otherwise draw empty slots
+        positions.forEach((pos, index) => {
+            if (index < photosTakenData.length) {
+                const img = new Image();
+                img.onload = () => {
+                    const imgAspectRatio = img.width / img.height;
+                    const slotAspectRatio = pos.width / pos.height;
+
+                    let sourceX = 0;
+                    let sourceY = 0;
+                    let sourceWidth = img.width;
+                    let sourceHeight = img.height;
+
+                    if (imgAspectRatio > slotAspectRatio) { // Gambar lebih lebar dari slot (crop horizontal)
+                        sourceWidth = img.height * slotAspectRatio;
+                        sourceX = (img.width - sourceWidth) / 2;
+                    } else if (imgAspectRatio < slotAspectRatio) { // Gambar lebih tinggi dari slot (crop vertikal)
+                        sourceHeight = img.width / slotAspectRatio;
+                        sourceY = (img.height - sourceHeight) / 2;
+                    }
+                    
+                    finalLayoutContext.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, pos.x, pos.y, pos.width, pos.height);
+
+                    // Add a thin border around photos
+                    finalLayoutContext.strokeStyle = 'rgba(0,0,0,0.2)';
+                    finalLayoutContext.lineWidth = finalCanvasSize * 0.003;
+                    finalLayoutContext.strokeRect(pos.x, pos.y, pos.width, pos.height);
+                };
+                img.src = photosTakenData[index];
+            } else {
+                // Draw an empty slot (placeholder)
+                finalLayoutContext.fillStyle = 'hsl(var(--b3))'; // Background color for empty slot
+                finalLayoutContext.fillRect(pos.x, pos.y, pos.width, pos.height);
+                finalLayoutContext.strokeStyle = 'hsl(var(--bc) / 0.5)'; // Border color for empty slot
+                finalLayoutContext.lineWidth = finalCanvasSize * 0.003;
+                finalLayoutContext.strokeRect(pos.x, pos.y, pos.width, pos.height);
+
+                // Add text for empty slots (optional)
+                finalLayoutContext.fillStyle = 'hsl(var(--bc) / 0.7)'; // Lighter text color
+                finalLayoutContext.font = `${finalCanvasSize * 0.04}px sans-serif`; // Adjust font size relative to canvas
+                finalLayoutContext.textAlign = 'center';
+                finalLayoutContext.textBaseline = 'middle';
+                finalLayoutContext.fillText(`Foto ${index + 1}`, pos.x + pos.width / 2, pos.y + pos.height / 2);
+            }
+        });
+
+        // --- NEW: Draw the selected frame ---
+        if (currentFrame !== 'none') {
+            const frameThickness = finalCanvasSize * 0.03; // Ketebalan bingkai 3% dari ukuran kanvas
+            finalLayoutContext.lineWidth = frameThickness;
+            finalLayoutContext.setLineDash([]); // Pastikan reset line dash untuk bingkai solid
+
+            if (currentFrame === 'black') {
+                finalLayoutContext.strokeStyle = 'black';
+            } else if (currentFrame === 'primary-color') {
+                finalLayoutContext.strokeStyle = getPrimaryColor();
+            } else if (currentFrame === 'blue-dashed') {
+                finalLayoutContext.strokeStyle = 'blue';
+                finalLayoutContext.lineWidth = finalCanvasSize * 0.02; // Ketebalan sedikit berbeda
+                finalLayoutContext.setLineDash([finalCanvasSize * 0.01, finalCanvasSize * 0.015]); // Pola garis putus-putus
+            } else if (currentFrame === 'red-thick') {
+                finalLayoutContext.strokeStyle = 'red';
+                finalLayoutContext.lineWidth = finalCanvasSize * 0.05; // Bingkai lebih tebal
+            } else if (currentFrame === 'green-double') {
+                // Bingkai ganda (garis luar dan garis dalam)
+                finalLayoutContext.strokeStyle = 'green';
+                finalLayoutContext.lineWidth = finalCanvasSize * 0.01; // Garis luar tipis
+                finalLayoutContext.strokeRect(
+                    frameThickness / 2,
+                    frameThickness / 2,
+                    finalCanvasSize - frameThickness,
+                    finalCanvasSize - frameThickness
+                );
+                // Garis kedua (dalam)
+                finalLayoutContext.strokeStyle = 'darkgreen';
+                finalLayoutContext.lineWidth = finalCanvasSize * 0.005;
+                const innerOffset = finalCanvasSize * 0.01; // Offset dari garis luar
+                finalLayoutContext.strokeRect(
+                    frameThickness / 2 + innerOffset,
+                    frameThickness / 2 + innerOffset,
+                    finalCanvasSize - frameThickness - (2 * innerOffset),
+                    finalCanvasSize - frameThickness - (2 * innerOffset)
+                );
+                // Penting: Kembalikan pengaturan konteks ke default setelah menggambar bingkai khusus ini
+                finalLayoutContext.setLineDash([]);
+                finalLayoutContext.lineWidth = frameThickness; // Kembali ke default thickness
+                return; // Hindari strokeRect() di bawah yang akan menimpa
+            } else if (currentFrame === 'yellow-shadow') {
+                finalLayoutContext.strokeStyle = 'yellow';
+                finalLayoutContext.lineWidth = finalCanvasSize * 0.03;
+
+                // Tambahkan bayangan (opsional, bisa disesuaikan)
+                finalLayoutContext.shadowColor = 'rgba(0, 0, 0, 0.5)'; // Warna bayangan
+                finalLayoutContext.shadowBlur = finalCanvasSize * 0.01; // Kekaburan bayangan
+                finalLayoutContext.shadowOffsetX = finalCanvasSize * 0.005; // Offset X bayangan
+                finalLayoutContext.shadowOffsetY = finalCanvasSize * 0.005; // Offset Y bayangan
+            }
+            
+            // Gambar bingkai di sekeliling seluruh area canvas
+            finalLayoutContext.strokeRect(
+                finalLayoutContext.lineWidth / 2, // Sesuaikan koordinat agar bingkai berada di dalam canvas
+                finalLayoutContext.lineWidth / 2,
+                finalCanvasSize - finalLayoutContext.lineWidth,
+                finalCanvasSize - finalLayoutContext.lineWidth
+            );
+
+            // Penting: Reset shadow properties setelah menggambar
+            finalLayoutContext.shadowColor = 'transparent';
+            finalLayoutContext.shadowBlur = 0;
+            finalLayoutContext.shadowOffsetX = 0;
+            finalLayoutContext.shadowOffsetY = 0;
+            finalLayoutContext.setLineDash([]); // Pastikan reset line dash
+        }
+        // --- END NEW: Draw the selected frame ---
+    }
+
+    // --- Event Listeners ---
 
     startWebcamBtn.addEventListener('click', startWebcam);
     captureBtn.addEventListener('click', capturePhoto);
+    resetBtn.addEventListener('click', resetPhotobooth);
 
-    // Fungsi notifikasi sederhana (bisa diambil dari pasfoto2.jinja jika ada standarisasi)
-    function showNotification(message, type = 'info') {
-        // Untuk konsistensi, idealnya Anda punya satu fungsi notifikasi global
-        alert(`${type.toUpperCase()}: ${message}`);
-        console.log(`Notification (${type}): ${message}`);
-    }
+    downloadPhotoBtn.addEventListener('click', (event) => { // Added event parameter
+        // Pastikan ada gambar untuk diunduh
+        if (photosTakenCount > 0 && finalLayoutPreview.style.display === 'block') {
+            const filename = `photobooth_potocraft_${new Date().toISOString().slice(0,19).replace(/[-:T.]/g,"")}.png`;
+            downloadPhotoBtn.download = filename;
+            downloadPhotoBtn.href = finalLayoutPreview.toDataURL('image/png');
+            showNotification('Foto berhasil diunduh!', 'success');
+        } else {
+            showNotification('Tidak ada foto untuk diunduh.', 'warning');
+            event.preventDefault(); // Mencegah navigasi jika tidak ada foto
+        }
+    });
+
+    // Event listener untuk tombol pilihan layout
+    layoutOptionBtns.forEach(button => {
+        button.addEventListener('click', () => {
+            const layout = button.dataset.layout;
+            if (currentLayout === layout) {
+                showNotification(`Layout ${layout} sudah aktif.`, 'info');
+                return;
+            }
+
+            // Reset UI terkait layout dan foto sebelumnya
+            photosTakenData = [];
+            photosTakenCount = 0;
+            currentLayout = layout; // Set layout baru
+            updateCaptureButtonText();
+            captureBtn.disabled = true; // Disable capture until webcam starts/restarts with new layout
+
+            // Update visual active button
+            layoutOptionBtns.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            // --- CALL drawFinalLayoutPreview HERE to show the empty layout preview ---
+            drawFinalLayoutPreview();
+            finalPlaceholder.textContent = 'Mulai kamera untuk mengambil foto pertama!';
+
+            // Reset webcam feed filter in case it was applied
+            videoElement.classList.remove(...Array.from(videoElement.classList).filter(c => c.startsWith('filter-')));
+
+            // Jika kamera sudah aktif, restart agar pesan dan statusnya sesuai
+            if (stream) {
+                startWebcam();
+            } else {
+                 showNotification(`Layout diatur ke ${layout}. Silakan mulai kamera.`, 'info');
+            }
+        });
+    });
+
+    // Event listener untuk tombol filter
+    filterSelectionBtns.forEach(button => {
+        button.addEventListener('click', () => {
+            currentFilter = button.dataset.filter;
+            // Apply filter to video feed for real-time preview
+            videoElement.classList.remove(...Array.from(videoElement.classList).filter(c => c.startsWith('filter-')));
+            if (currentFilter !== 'none') {
+                videoElement.classList.add(`filter-${currentFilter}`);
+            }
+
+            // Update active filter button
+            filterSelectionBtns.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            showNotification(`Filter diatur ke: ${currentFilter}`, 'info');
+        });
+    });
+
+    // NEW: Event listener untuk tombol frame
+    frameSelectionBtns.forEach(button => {
+        button.addEventListener('click', () => {
+            currentFrame = button.dataset.frame;
+            // Update active frame button
+            frameSelectionBtns.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            // Jika sudah ada foto yang diambil atau layout sudah dipilih, update preview untuk menampilkan bingkai
+            // Ini penting agar bingkai langsung terlihat tanpa harus ambil foto baru
+            if (photosTakenCount > 0 || currentLayout) {
+                drawFinalLayoutPreview();
+            }
+            showNotification(`Bingkai diatur ke: ${currentFrame}`, 'info');
+        });
+    });
+
+    // --- Inisialisasi Awal ---
+    resetPhotobooth(); // Atur kondisi awal saat halaman dimuat
 
     // Hentikan stream kamera saat halaman ditutup atau pengguna navigasi ke halaman lain
     window.addEventListener('beforeunload', () => {
