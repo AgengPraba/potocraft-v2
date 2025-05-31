@@ -12,7 +12,7 @@ def pasfoto():
 
 @main_bp.route('/hapus-background')
 def hapus_background():
-    return render_template('hapus_background.jinja')
+    return render_template('hapus_background_interactive.jinja')
 
 @main_bp.route('/tingkatkan-foto')
 def tingkatkan_foto():

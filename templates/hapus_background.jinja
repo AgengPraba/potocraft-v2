@@ -16,16 +16,19 @@
 
     <div class="form-control mt-4">
       <label class="label" for="bgColorRemoveBg">
-        <span class="label-text">Warna Background Baru (Kosongkan untuk Transparan)</span>
+        <span class="label-text">Warna Background Baru</span>
       </label>
       <div class="flex items-center gap-2">
         <input type="color" id="bgColorRemoveBg" value="#FFFFFF" class="input input-sm input-bordered h-10 w-16" />
-        <button id="transparentBtnRemoveBg" class="btn btn-sm btn-ghost">Buat Transparan</button>
+        <button id="transparentBtnRemoveBg" class="btn btn-sm btn-ghost">Jadikan Transparan</button>
       </div>
+      <label class="label">
+        <span class="label-text-alt">Kosongkan input warna di atas jika ingin background transparan setelah menekan tombol "Jadikan Transparan".</span>
+      </label>
     </div>
 
     <div class="card-actions justify-end mt-6">
-      <button id="processRemoveBgBtn" class="btn btn-primary">Hapus Background</button>
+      <button id="processRemoveBgBtn" class="btn btn-primary">Hapus/Ganti Background</button>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
@@ -38,6 +41,7 @@
         <h3 class="font-semibold mb-2">Hasil Proses:</h3>
         <img id="processedPreviewRemoveBg" src="#" alt="Preview Hasil" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
         <div id="processedPlaceholderRemoveBg" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Hasil</div>
+        <a id="downloadProcessedRemoveBgBtn" class="btn btn-sm btn-secondary mt-2 w-full" style="display:none;">Unduh Hasil</a>
       </div>
     </div>
   </div>
@@ -56,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bgColorInput = document.getElementById('bgColorRemoveBg');
     const transparentBtn = document.getElementById('transparentBtnRemoveBg');
     const processBtn = document.getElementById('processRemoveBgBtn');
+    const downloadBtn = document.getElementById('downloadProcessedRemoveBgBtn'); // Tombol download baru
     let uploadedFile = null;
 
     imageUpload.addEventListener('change', (event) => {
@@ -68,20 +73,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 originalPreview.style.display = 'block';
                 originalPlaceholder.style.display = 'none';
                 processedPreview.style.display = 'none';
-                processedPlaceholder.style.display = 'block';
+                processedPlaceholder.style.display = 'flex'; // Tampilkan placeholder hasil
+                processedPlaceholder.textContent = 'Preview Hasil';
                 processedPreview.src = '#';
+                if(downloadBtn) downloadBtn.style.display = 'none'; // Sembunyikan tombol download
             }
             reader.readAsDataURL(file);
         }
     });
 
     transparentBtn.addEventListener('click', () => {
-        // Untuk benar-benar transparan, kita bisa mengirim nilai khusus ke backend
-        // atau backend bisa mendeteksi jika tidak ada warna yang diberikan.
-        // Untuk UI, kita bisa mengosongkan color picker atau memberinya tanda.
-        // Untuk demo ini, anggap backend akan handle jika bgColor kosong/null.
-        bgColorInput.value = ''; // Atau cara lain menandakan transparan
-        alert("Background akan dibuat transparan. Klik 'Hapus Background'.");
+        // Mengosongkan nilai input warna memberitahu backend untuk membuat transparan
+        // Alternatifnya, kita bisa set ke string khusus atau checkbox, tapi string kosong sudah ditangani backend
+        bgColorInput.value = ""; // Kosongkan color picker value
+        // Untuk visual feedback ke pengguna bahwa opsi transparan dipilih:
+        // Anda bisa mengubah tampilan input warna atau memberi notifikasi
+        alert("Warna background akan dibuat transparan saat diproses. Anda juga bisa membiarkan input warna kosong.");
     });
 
     processBtn.addEventListener('click', () => {
@@ -91,28 +98,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const formData = new FormData();
         formData.append('image', uploadedFile);
-        formData.append('bgColor', bgColorInput.value); // Kirim warna, atau string kosong untuk transparan
+        // Jika bgColorInput.value kosong, backend akan menganggapnya sebagai permintaan transparan
+        formData.append('bgColor', bgColorInput.value.trim()); 
 
-        // Tampilkan spinner/loading
         processedPlaceholder.textContent = 'Memproses...';
         processedPlaceholder.style.display = 'flex';
         processedPreview.style.display = 'none';
+        if(downloadBtn) downloadBtn.style.display = 'none';
 
-        fetch("{{ url_for('process.process_remove_background') }}", { // Perlu route baru di process.py
+        fetch("{{ url_for('process.process_remove_background') }}", {
             method: 'POST',
             body: formData
         })
         .then(response => {
             if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.error || 'Gagal memproses gambar.')});
+                return response.json().then(err => { 
+                    const errorMsg = err.error || 'Gagal memproses gambar.';
+                    console.error('Server error response:', err);
+                    throw new Error(errorMsg);
+                });
             }
             return response.json();
         })
         .then(data => {
-            if (data.url) {
+            if (data.url && data.filename) {
                 processedPreview.src = data.url + '?t=' + new Date().getTime(); // Cache buster
                 processedPreview.style.display = 'block';
                 processedPlaceholder.style.display = 'none';
+
+                // Tampilkan dan siapkan tombol download
+                if(downloadBtn) {
+                    downloadBtn.href = data.url; // Link langsung ke file statis
+                    // Jika ingin menggunakan endpoint download Flask khusus:
+                    // downloadBtn.href = "{{ url_for('process.download_file', filename='PLACEHOLDER') }}".replace('PLACEHOLDER', data.filename);
+                    downloadBtn.download = data.filename; // Nama file saat diunduh
+                    downloadBtn.style.display = 'inline-flex';
+                }
             } else if (data.error) {
                 throw new Error(data.error);
             }
@@ -120,9 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => {
             console.error('Error:', error);
             alert('Terjadi kesalahan: ' + error.message);
-            processedPlaceholder.textContent = 'Preview Hasil'; // Reset placeholder
+            processedPlaceholder.textContent = 'Preview Hasil'; 
             processedPlaceholder.style.display = 'flex';
             processedPreview.style.display = 'none';
+            if(downloadBtn) downloadBtn.style.display = 'none';
         });
     });
 });

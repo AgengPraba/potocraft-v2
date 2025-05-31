@@ -13,6 +13,7 @@ def create_app():
     # 1. Konfigurasi UPLOAD_FOLDER dengan path absolut yang robust
     # app.static_folder akan menjadi path absolut ke folder statis Anda (misalnya, C:/static)
     # setelah inisialisasi Flask.
+    app.config.setdefault('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})
     upload_folder_path = os.path.join(app.static_folder, 'uploads')
     app.config['UPLOAD_FOLDER'] = upload_folder_path
     
