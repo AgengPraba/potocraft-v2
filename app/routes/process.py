@@ -203,82 +203,8 @@ def download_file(filename):
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
-#============================ fitur selain pas foto
 
-@process_bp.route('/process-remove-background', methods=['POST'])
-def process_remove_background():
-    if 'image' not in request.files:
-        return jsonify({'error': 'Tidak ada file gambar'}), 400
-    
-    file = request.files['image']
-    # Ambil warna, strip whitespace. Jika kosong, akan jadi background transparan.
-    bg_color_hex = request.form.get('bgColor', '').strip() 
-
-    if file.filename == '':
-        return jsonify({'error': 'Nama file kosong'}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Format file tidak diizinkan'}), 400
-
-    try:
-        input_image_bytes = file.read() # Baca file sebagai bytes
-        
-        # 1. Hapus background menggunakan rembg
-        # Hasilnya adalah bytes dari gambar PNG RGBA (dengan background transparan)
-        img_bytes_no_bg_transparent = remove(input_image_bytes) 
-
-        # Konversi bytes hasil rembg ke objek Image Pillow untuk diproses lebih lanjut
-        img_pil_no_bg = Image.open(io.BytesIO(img_bytes_no_bg_transparent)).convert("RGBA")
-
-        output_image_pil = img_pil_no_bg # Defaultnya adalah gambar transparan
-
-        # 2. Jika ada warna background yang valid, terapkan
-        if bg_color_hex and bg_color_hex.startswith('#'):
-            cleaned_hex = bg_color_hex.lstrip('#')
-            if len(cleaned_hex) == 6: # Format #RRGGBB
-                try:
-                    bg_color_rgb = tuple(int(cleaned_hex[i:i+2], 16) for i in (0, 2, 4))
-                    background_layer = Image.new("RGBA", img_pil_no_bg.size, (*bg_color_rgb, 255))
-                    # Composite gambar transparan di atas background berwarna
-                    output_image_pil = Image.alpha_composite(background_layer, img_pil_no_bg)
-                    current_app.logger.info(f"Menerapkan background warna: {bg_color_hex}")
-                except ValueError:
-                    current_app.logger.warning(f"Format kode warna Hex tidak valid: {bg_color_hex}. Menggunakan background transparan.")
-                    # Jika warna tidak valid, output_image_pil tetap transparan
-            elif len(cleaned_hex) == 3: # Format #RGB
-                try:
-                    bg_color_rgb = tuple(int(c*2, 16) for c in cleaned_hex) # Konversi #RGB ke #RRGGBB
-                    background_layer = Image.new("RGBA", img_pil_no_bg.size, (*bg_color_rgb, 255))
-                    output_image_pil = Image.alpha_composite(background_layer, img_pil_no_bg)
-                    current_app.logger.info(f"Menerapkan background warna (dari #RGB): {bg_color_hex}")
-                except ValueError:
-                    current_app.logger.warning(f"Format kode warna Hex (#RGB) tidak valid: {bg_color_hex}. Menggunakan background transparan.")
-            else:
-                 current_app.logger.warning(f"Panjang kode warna Hex tidak valid: {bg_color_hex}. Menggunakan background transparan.")
-        else:
-            current_app.logger.info("Tidak ada warna background valid atau diminta transparan.")
-            # output_image_pil sudah img_pil_no_bg (transparan)
-
-        # 3. Simpan hasil akhir (selalu sebagai PNG untuk mendukung transparansi)
-        original_filename_secure = secure_filename_custom(file.filename)
-        base_name, _ = os.path.splitext(original_filename_secure)
-        
-        unique_filename = f"removedbg_{uuid.uuid4().hex}_{base_name}.png"
-        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-        
-        output_image_pil.save(save_path, 'PNG')
-        
-        current_app.logger.info(f"Proses Hapus BG untuk '{file.filename}'. Disimpan sebagai {unique_filename}")
-        processed_url = f"/static/uploads/{unique_filename}" 
-
-        return jsonify({'url': processed_url, 'filename': unique_filename})
-
-    except Exception as e:
-        current_app.logger.error(f"Error saat proses remove_background: {e}")
-        # Tambahkan traceback untuk debugging di server log
-        import traceback
-        current_app.logger.error(traceback.format_exc())
-        return jsonify({'error': f'Terjadi kesalahan internal server: {str(e)}'}), 500
+#============================ seleksi objek otomatis ============================
 
 @process_bp.route('/interactive-segmentation', methods=['POST'])
 def process_interactive_segmentation():
@@ -432,10 +358,12 @@ def process_interactive_segmentation():
             # ... (error handling fallback)
             return jsonify({'error': f'Gagal memproses seleksi dan fallback: {str(e_rembg_fallback)}'}), 500
     except Exception as e: 
-        current_app.logger.error(f"Error tidak terduga: {e}")
+        current_app.logger.error(f"Error tidak terduga: {e}")   
         current_app.logger.error(traceback.format_exc())
         return jsonify({'error': f'Terjadi kesalahan internal server: {str(e)}'}), 500
 
+
+#============================ fitur peningkatan kualitas image ============================
 @process_bp.route('/process-enhance-photo', methods=['POST'])
 def process_enhance_photo():
     if 'image' not in request.files:
@@ -478,6 +406,8 @@ def process_enhance_photo():
         return jsonify({'error': str(e)}), 500
     # --- AKHIR LOGIKA PEMROSESAN (CONTOH DUMMY) ---
 
+
+#============================ fitur kompresi image ============================
 @process_bp.route('/process-compress-photo', methods=['POST'])
 def process_compress_photo():
     if 'image' not in request.files:
@@ -530,38 +460,3 @@ def process_compress_photo():
     except Exception as e:
         current_app.logger.error(f"Error dummy process_compress_photo: {e}")
         return jsonify({'error': str(e)}), 500  
-
-#===============photoboth=============
-import base64 # Untuk decode data URL jika dikirim dari client
-
-@process_bp.route('/save-photobooth-image', methods=['POST'])
-def save_photobooth_image():
-    data = request.json
-    if not data or 'imageDataUrl' not in data:
-        return jsonify({'error': 'Tidak ada data gambar'}), 400
-
-    try:
-        # imageDataUrl akan berupa: "data:image/png;base64,iVBORw0KGgoAAAANSU..."
-        header, encoded = data['imageDataUrl'].split(',', 1)
-        image_data = base64.b64decode(encoded)
-        
-        # Tentukan ekstensi dari header (meskipun kita set ke PNG di client)
-        # file_extension = header.split(';')[0].split('/')[1] 
-        file_extension = 'png' # Kita tahu client mengirim PNG
-
-        filename = f"photobooth_{uuid.uuid4().hex}.{file_extension}"
-        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-
-        with open(save_path, 'wb') as f:
-            f.write(image_data)
-        
-        current_app.logger.info(f"Photobooth image '{filename}' saved.")
-        return jsonify({
-            'message': 'Foto photobooth berhasil disimpan di server.',
-            'filename': filename,
-            'url': f"/static/uploads/{filename}"
-        }), 201 # 201 Created
-
-    except Exception as e:
-        current_app.logger.error(f"Error saving photobooth image: {e}")
-        return jsonify({'error': f'Gagal menyimpan foto: {str(e)}'}), 500

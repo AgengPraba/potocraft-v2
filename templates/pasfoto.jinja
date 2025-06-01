@@ -134,7 +134,7 @@
 
     <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-4" aria-label="Download" disabled />
     <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6">
-      <h2 class="text-xl font-bold mb-2">5. Unduh Foto (Sebelumnya 6)</h2>
+      <h2 class="text-xl font-bold mb-2">5. Unduh Foto</h2>
       <p class="mb-4">Foto Anda siap untuk diunduh!</p>
       <div class="text-center mb-4">
           <img id="finalPreviewImage" src="#" alt="Hasil Akhir Foto" style="display:none;" class="border rounded-md shadow-lg"/>
@@ -205,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showSpinner(message = "Memproses...") { console.log(message); }
     function hideSpinner() { console.log("Selesai."); }
-    function showNotification(message, type = 'info') { alert(`${type.toUpperCase()}: ${message}`); console.log(`Notification (${type}): ${message}`);}
 
     function enableTab(tabIndex, autoNavigate = false) {
         console.log(`Enabling tab ${tabIndex}, autoNav: ${autoNavigate}`);

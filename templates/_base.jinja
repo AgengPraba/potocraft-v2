@@ -63,6 +63,27 @@
            localStorage.setItem('theme', 'light');
          }
        }
+
+       
+    function showNotification(message, type = 'info') {
+        const notificationContainer = document.createElement('div');
+        const alertClass = type === 'success' ? 'alert-success' : type === 'warning' ? 'alert-warning' : type === 'error' ? 'alert-error' : 'alert-info';
+        notificationContainer.className = `alert ${alertClass} fixed top-4 left-1/2 -translate-x-1/2 z-50 w-auto shadow-lg px-6 py-3 rounded-lg flex items-center space-x-2`;
+        notificationContainer.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                ${type === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />' : ''}
+                ${type === 'warning' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.02 6.002v3.001m0 4.001h.01m-6.91 6.908a9 9 0 1113.82 0l-3.46 3.46c-.53.53-1.38-.53-1.91 0L3.11 19.01a9 9 0 010-13.82z" />' : ''}
+                ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />' : ''}
+                ${type === 'info' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' : ''}
+            </svg>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(notificationContainer);
+
+        setTimeout(() => {
+            notificationContainer.remove();
+        }, 3000); // Hapus notifikasi setelah 3 detik
+    }
       </script>
 
     {% endblock %}

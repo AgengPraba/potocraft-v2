@@ -8,7 +8,7 @@ def index():
 
 @main_bp.route('/pasfoto')
 def pasfoto():
-    return render_template('pasfoto2.jinja')
+    return render_template('pasfoto.jinja')
 
 @main_bp.route('/hapus-background')
 def hapus_background():
