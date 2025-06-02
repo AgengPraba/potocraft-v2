@@ -55,83 +55,160 @@ def upload_file():
     return jsonify({"error": "File tidak valid"}), 400
 
 
+def _make_image_transparent_with_rembg(source_image_path_or_pil_image, original_base_filename_for_naming):
+    """
+    Menerima path gambar atau objek PIL Image, menghilangkan backgroundnya, 
+    menyimpannya, dan mengembalikan nama file barunya.
+    Selalu disimpan sebagai PNG.
+    """
+    try:
+        if isinstance(source_image_path_or_pil_image, str): # Jika path
+            if not os.path.exists(source_image_path_or_pil_image):
+                raise FileNotFoundError(f"File sumber untuk transparansi tidak ditemukan: {source_image_path_or_pil_image}")
+            with open(source_image_path_or_pil_image, 'rb') as f_in:
+                input_bytes = f_in.read()
+        elif isinstance(source_image_path_or_pil_image, Image.Image): # Jika objek PIL
+            img_pil = source_image_path_or_pil_image.convert("RGB") # Rembg lebih baik dengan RGB input
+            img_byte_arr = io.BytesIO()
+            img_pil.save(img_byte_arr, format='PNG') # Simpan ke bytes dalam format yang bisa dibaca rembg
+            input_bytes = img_byte_arr.getvalue()
+        else:
+            raise ValueError("Input untuk _make_image_transparent_with_rembg harus path string atau objek PIL Image.")
+
+        output_bytes = remove(input_bytes)
+        
+        # Simpan hasil transparan
+        base_name, _ = os.path.splitext(original_base_filename_for_naming)
+        transparent_filename = f"{uuid.uuid4().hex}_{base_name}_transparent.png"
+        transparent_save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], transparent_filename)
+        
+        with open(transparent_save_path, 'wb') as f_out:
+            f_out.write(output_bytes)
+        
+        current_app.logger.info(f"Versi transparan '{transparent_filename}' dibuat.")
+        return transparent_filename
+    except Exception as e:
+        current_app.logger.error(f"Gagal membuat versi transparan: {e}")
+        current_app.logger.error(traceback.format_exc())
+        raise # Re-raise exception untuk ditangani oleh pemanggil
+
 @process_bp.route('/crop', methods=['POST'])
 def crop_image():
     if 'cropped' not in request.files:
         return jsonify({'error': 'Tidak ada data gambar yang di-crop'}), 400
 
-    brightness = float(request.form.get('brightness', 1.0)) # Terima nilai kecerahan, default 1.0
+    brightness_factor = float(request.form.get('brightness', 1.0))
+    cropped_file_storage = request.files['cropped']
+    original_filename_from_form = request.form.get('original_filename') 
 
-    cropped_file = request.files['cropped']
-    original_filename = request.form.get('original_filename') # Kita perlu mengirim ini dari frontend
-
-    if cropped_file and original_filename:
-        try:
-            img = Image.open(cropped_file)
-            # Aplikasikan kecerahan
-            enhancer = ImageEnhance.Brightness(img)
-            img_brightened = enhancer.enhance(brightness)
-
-            original_name, ext = os.path.splitext(secure_filename_custom(original_filename))
-            cropped_unique_filename = f"{uuid.uuid4().hex}_{original_name}_cropped_brightened{ext}"
-            save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], cropped_unique_filename)
-            img_brightened.save(save_path)
-            current_app.logger.info(f"File '{cropped_unique_filename}' disimpan.")
-            return jsonify({'filename': cropped_unique_filename, 'url': f"/static/uploads/{cropped_unique_filename}"}), 200
-        except Exception as e:
-            current_app.logger.error(f"Error saat crop dan mengubah kecerahan: {e}")
-            return jsonify({'error': f'Gagal memproses crop: {str(e)}'}), 500
-    return jsonify({'error': 'File crop atau nama file asli tidak valid'}), 400
-
-
-@process_bp.route('/remove_bg', methods=['POST'])
-def remove_background_api():
-    data = request.json
-    if not data or 'filename' not in data or 'bgColor' not in data:
-        return jsonify({"error": "Data tidak lengkap (filename atau bgColor tidak ada)"}), 400
-
-    filename = data['filename']
-    bg_color_hex = data['bgColor'] # contoh: "#FF0000"
-
-    input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], secure_filename_custom(filename))
-
-    if not os.path.exists(input_path):
-        return jsonify({"error": f"File '{filename}' tidak ditemukan."}), 404
+    if not (cropped_file_storage and original_filename_from_form):
+        return jsonify({'error': 'File crop atau nama file asli tidak valid'}), 400
 
     try:
-        with Image.open(input_path) as img:
-            # Hapus background menggunakan rembg
-            img_no_bg = remove(img) # Hasilnya adalah RGBA dengan background transparan
-
-            # Buat background baru dengan warna yang dipilih
-            # Konversi warna hex ke tuple RGB
-            bg_color_hex = bg_color_hex.lstrip('#')
-            bg_color_rgb = tuple(int(bg_color_hex[i:i+2], 16) for i in (0, 2, 4))
-            
-            # Buat gambar background dengan warna solid dan ukuran yang sama
-            # Pastikan background punya alpha channel jika akan di-composite dengan gambar RGBA
-            background_img = Image.new("RGBA", img_no_bg.size, (*bg_color_rgb, 255))
-            
-            # Gabungkan gambar tanpa background di atas gambar background berwarna
-            # Pastikan img_no_bg dalam mode RGBA untuk alpha_composite
-            final_image = Image.alpha_composite(background_img, img_no_bg.convert("RGBA"))
-
-        original_name, _ = os.path.splitext(filename)
-        safe_original_name = secure_filename_custom(original_name)
-        new_filename = f"{uuid.uuid4().hex}_{safe_original_name}_bgremoved.png"
-        output_path = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
+        img_pil = Image.open(cropped_file_storage.stream) # Baca dari stream
         
-        final_image.save(output_path, 'PNG')
-        current_app.logger.info(f"File dengan background baru '{new_filename}' disimpan.")
+        # Aplikasikan kecerahan
+        if brightness_factor != 1.0: # Hanya proses jika ada perubahan
+            enhancer = ImageEnhance.Brightness(img_pil.convert("RGB")) # Enhance brightness pada versi RGB
+            img_pil_brightened = enhancer.enhance(brightness_factor)
+            # Jika gambar asli punya alpha, gabungkan kembali alpha channel ke gambar yang sudah brightened
+            if 'A' in img_pil.getbands():
+                alpha = img_pil.split()[-1]
+                img_pil_brightened = Image.merge('RGBA', (*img_pil_brightened.split(), alpha))
+            else:
+                img_pil_brightened = img_pil_brightened.convert(img_pil.mode) # Kembalikan ke mode asli jika bukan RGBA
+        else:
+            img_pil_brightened = img_pil # Tidak ada perubahan brightness
+
+        # Simpan gambar hasil crop + brightness
+        # Gunakan original_filename_from_form untuk penamaan yang konsisten
+        safe_original_filename = secure_filename_custom(original_filename_from_form)
+        base_name, ext = os.path.splitext(safe_original_filename)
+        # Pastikan ekstensi .png jika hasil crop (dari canvas) adalah PNG
+        cropped_unique_filename = f"{uuid.uuid4().hex}_{base_name}_cb.png" 
+        save_path_cropped_brightened = os.path.join(current_app.config['UPLOAD_FOLDER'], cropped_unique_filename)
+        img_pil_brightened.save(save_path_cropped_brightened, 'PNG') # CropperJS biasanya menghasilkan PNG dari canvas
+        current_app.logger.info(f"File crop+brightness '{cropped_unique_filename}' disimpan.")
+
+        # Otomatis buat versi transparan dari gambar yang sudah di-crop & brightened
+        transparent_version_filename = None
+        try:
+            # Mengirim objek PIL langsung ke helper, nama file asli untuk penamaan output transparan
+            transparent_version_filename = _make_image_transparent_with_rembg(img_pil_brightened, f"{base_name}_cb{ext}")
+        except Exception as e_transparent:
+            current_app.logger.error(f"Gagal membuat versi transparan otomatis setelah crop: {e_transparent}")
+            # Tidak mengembalikan error fatal, tapi frontend akan tahu versi transparan gagal dibuat
+
         return jsonify({
-            "message": "Background berhasil diproses",
-            "filename": new_filename,
-            "url": f"/static/uploads/{new_filename}"
+            'filename': cropped_unique_filename, 
+            'url': f"/static/uploads/{cropped_unique_filename}",
+            'transparent_filename': transparent_version_filename, # Bisa None jika gagal
+            'transparent_url': f"/static/uploads/{transparent_version_filename}" if transparent_version_filename else None,
+            'message': 'Crop berhasil' + ('' if transparent_version_filename else ', tetapi gagal membuat versi transparan otomatis.')
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error saat crop/brightness/auto-transparent: {e}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'Gagal memproses crop: {str(e)}'}), 500
+
+@process_bp.route('/apply-color', methods=['POST'])
+def apply_color_to_image():
+    data = request.json
+    if not data or 'transparent_filename' not in data or 'bgColor' not in data:
+        return jsonify({"error": "Data tidak lengkap (transparent_filename atau bgColor tidak ada)"}), 400
+
+    transparent_filename = secure_filename_custom(data['transparent_filename'])
+    bg_color_hex = data['bgColor'].strip()
+
+    transparent_image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], transparent_filename)
+
+    if not os.path.exists(transparent_image_path):
+        return jsonify({"error": f"File transparan '{transparent_filename}' tidak ditemukan."}), 404
+
+    try:
+        img_pil_transparent = Image.open(transparent_image_path).convert("RGBA")
+        output_image_pil = img_pil_transparent # Default jika tidak ada warna / warna tidak valid
+
+        if bg_color_hex and bg_color_hex.startswith('#'):
+            cleaned_hex = bg_color_hex.lstrip('#')
+            if len(cleaned_hex) == 6: # #RRGGBB
+                try:
+                    bg_color_rgb = tuple(int(cleaned_hex[i:i+2], 16) for i in (0, 2, 4))
+                    background_layer = Image.new("RGBA", img_pil_transparent.size, (*bg_color_rgb, 255))
+                    output_image_pil = Image.alpha_composite(background_layer, img_pil_transparent)
+                except ValueError:
+                    current_app.logger.warning(f"Hex color '{bg_color_hex}' tidak valid, background tidak diubah dari transparan.")
+            elif len(cleaned_hex) == 3: # #RGB
+                try:
+                    bg_color_rgb = tuple(int(c*2, 16) for c in cleaned_hex)
+                    background_layer = Image.new("RGBA", img_pil_transparent.size, (*bg_color_rgb, 255))
+                    output_image_pil = Image.alpha_composite(background_layer, img_pil_transparent)
+                except ValueError:
+                    current_app.logger.warning(f"Hex color (#RGB) '{bg_color_hex}' tidak valid, background tidak diubah dari transparan.")
+            else: # Panjang hex tidak valid
+                current_app.logger.warning(f"Panjang Hex color '{bg_color_hex}' tidak valid, background tidak diubah dari transparan.")
+        else: # Tidak ada warna, biarkan transparan
+            current_app.logger.info(f"bgColor tidak valid atau kosong ('{bg_color_hex}'), gambar tetap transparan.")
+
+
+        base_name, _ = os.path.splitext(transparent_filename.replace('_transparent', ''))
+        final_colored_filename = f"{uuid.uuid4().hex}_{base_name}_finalcolor.png"
+        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], final_colored_filename)
+        
+        output_image_pil.save(save_path, 'PNG')
+        current_app.logger.info(f"File dengan warna final '{final_colored_filename}' disimpan.")
+
+        return jsonify({
+            "message": "Warna background berhasil diterapkan.",
+            "filename": final_colored_filename,
+            "url": f"/static/uploads/{final_colored_filename}"
         }), 200
     except Exception as e:
-        current_app.logger.error(f"Error saat remove background: {e}")
-        return jsonify({"error": f"Gagal memproses background: {str(e)}"}), 500
-
+        current_app.logger.error(f"Error saat menerapkan warna: {e}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'Gagal menerapkan warna: {str(e)}'}), 500
+    
 @process_bp.route('/apply_outfit', methods=['POST'])
 def apply_outfit_api():
     data = request.json
@@ -197,12 +274,6 @@ def apply_outfit_api():
         current_app.logger.error(f"Error saat menerapkan outfit: {str(e)}")
         return jsonify({"error": f"Gagal menerapkan outfit: {str(e)}"}), 500
 
-@process_bp.route('/download/<filename>')
-def download_file(filename):
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
 #============================ seleksi objek otomatis ============================
 
@@ -460,3 +531,11 @@ def process_compress_photo():
     except Exception as e:
         current_app.logger.error(f"Error dummy process_compress_photo: {e}")
         return jsonify({'error': str(e)}), 500  
+
+
+@process_bp.route('/download/<filename>')
+def download_file(filename):
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']

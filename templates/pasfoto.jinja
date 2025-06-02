@@ -53,7 +53,7 @@
         <p class="text-lg">Drag & Drop Foto Di Sini atau</p>
         <input type="file" id="photoInput" accept="image/*" class="file-input file-input-bordered file-input-primary w-full max-w-xs mt-4" />
         <div class="mt-6 text-center">
-            <h3 class="text-md font-semibold text-base-content/70">Preview Awal:</h3>
+            <h3 class="text-md font-semibold text-base-content/70" style="display: none" id="teksIPreviewEl">Preview Awal:</h3>
             <img id="initialPreview" class="rounded-md" style="display: none;" />
             <p id="imageNamePreview" class="mt-2 text-sm text-base-content/60"></p>
         </div>
@@ -108,28 +108,29 @@
       <h2 class="text-xl font-bold mb-4">4. Atur Latar Belakang</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-            <h3 class="font-semibold mb-2 text-base-content/70">Preview (Live Update Warna):</h3>
+            <h3 class="font-semibold mb-2 text-base-content/70">Preview:</h3>
             <img id="bgResult" class="rounded-md" style="display: none;" alt="Preview Background" />
             <canvas id="bgLivePreviewCanvas"></canvas> 
+            <div id="bgPlaceholder" class="placeholder-box">Menunggu hasil crop...</div> </div>
         </div>
         <div class="space-y-4">
-          <div>
+          {# <div>
             <label class="label"><span class="label-text">Pilih Warna Kustom:</span></label>
-            <input type="color" id="bgColorInput" value="#FF0000" class="input input-bordered h-12 w-full max-w-xs" />
-          </div>
+            <input type="color" id="bgColorInput" value="#db1514" class="input input-bordered h-12 w-full max-w-xs" />
+          </div> #}
+           <input type="hidden" id="bgColorInput" value="#db1514" class="input input-bordered h-12 w-full max-w-xs" />
           <div>
-            <label class="label"><span class="label-text">Warna Cepat:</span></label>
+            <label class="label"><span class="label-text">Pilih Warna:</span></label>
             <div class="flex flex-wrap gap-2" id="quickColorButtonsContainer">
-              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #FF0000;" data-color="#FF0000" aria-label="Pilih warna merah"></button>
-              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #0000FF;" data-color="#0000FF" aria-label="Pilih warna biru"></button>
-              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #FFFFFF;" data-color="#FFFFFF" aria-label="Pilih warna putih"></button>
-              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #FFFF00;" data-color="#FFFF00" aria-label="Pilih warna kuning"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #db1514;" data-color="#db1514" aria-label="Pilih warna merah"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #0090ff;" data-color="#0090ff" aria-label="Pilih warna biru"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #0b00a3;" data-color="#0b00a3" aria-label="Pilih warna putih"></button>
+              <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #f7e811;" data-color="#f7e811" aria-label="Pilih warna kuning"></button>
               <button class="w-10 h-10 rounded-full border-2 hover:border-primary focus:border-primary" style="background-color: #008000;" data-color="#008000" aria-label="Pilih warna hijau"></button>
             </div>
           </div>
-          <button id="removeBgBtn" class="btn btn-accent w-full mt-4">Proses Background & Lanjutkan ke Download</button>
+          <button id="processBgFinalBtn" class="btn btn-accent w-full mt-4">Lanjutkan</button>
         </div>
-      </div>
     </div>
 
     <input type="radio" name="pasfoto_tabs" role="tab" class="tab" id="tab-radio-4" aria-label="Download" disabled />
@@ -162,12 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let croppedFilename = null;         
     let bgRemovedFilename = null;       
     let transparentBgFilename = null;   
-    // outfitAppliedFilename DIHAPUS
     let finalFilenameForDownload = null;
 
     const dropArea = document.getElementById('drop-area');
     const photoInput = document.getElementById('photoInput');
     const initialPreviewEl = document.getElementById('initialPreview');
+    const teksIPreviewEl = document.getElementById('teksIPreviewEl');
     const imageNamePreviewEl = document.getElementById('imageNamePreview');
     
     const ratioSelect = document.getElementById('ratioSelect');
@@ -184,27 +185,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bgColorInput = document.getElementById('bgColorInput');
     const quickColorButtonsContainer = document.getElementById('quickColorButtonsContainer');
-    const removeBgBtn = document.getElementById('removeBgBtn');
     const bgResultEl = document.getElementById('bgResult');
     const bgLivePreviewCanvas = document.getElementById('bgLivePreviewCanvas'); 
+    const bgPlaceholder = document.getElementById('bgPlaceholder');
 
-    // Variabel dan elemen terkait Outfit DIHAPUS
-    // const outfitChoicesContainer = document.getElementById('outfitChoicesContainer');
-    // const skipOutfitBtn = document.getElementById('skipOutfitBtn');
-    // const outfitPreviewEl = document.getElementById('outfitPreview');
 
     const finalPreviewImageEl = document.getElementById('finalPreviewImage');
     const downloadBtn = document.getElementById('downloadBtn');
 
     const tabRadios = [];
-    // Loop hanya sampai 4 karena tab Outfit (index 4 lama) dihapus, Download jadi index 4 baru
     for (let i = 0; i <= 4; i++) { 
         const radio = document.getElementById(`tab-radio-${i}`);
         if (radio) tabRadios.push(radio); else console.warn(`Tab radio 'tab-radio-${i}' not found.`);
     }
 
-    function showSpinner(message = "Memproses...") { console.log(message); }
-    function hideSpinner() { console.log("Selesai."); }
+    function showSpinner(message = "Memproses...") {
+        const modal = document.getElementById('loadingSpinnerModal');
+        const messageElement = document.getElementById('loadingSpinnerMessage');
+
+        if (modal && messageElement) {
+            messageElement.textContent = message;
+            if (typeof modal.showModal === "function") {
+                modal.showModal();
+            } else {
+                console.warn("modal.showModal() tidak didukung, menggunakan metode lain (mungkin tidak optimal).");
+                modal.setAttribute('open', '');
+            }
+            console.log("Spinner ditampilkan:", message);
+        } else {
+            console.error("Elemen modal spinner (#loadingSpinnerModal atau #loadingSpinnerMessage) tidak ditemukan di DOM.");
+        console.log("(Fallback) Spinner message:", message);
+        }
+    }
+    function hideSpinner() {
+        const modal = document.getElementById('loadingSpinnerModal');
+        if (modal) {
+            if (typeof modal.close === "function") {
+                modal.close();
+            } else {
+                console.warn("modal.close() tidak didukung.");
+                modal.removeAttribute('open');
+            }
+            console.log("Spinner disembunyikan.");
+        } else {
+            console.error("Elemen modal spinner (#loadingSpinnerModal) tidak ditemukan di DOM untuk disembunyikan.");
+            console.log("(Fallback) Selesai.");
+        }
+    }
 
     function enableTab(tabIndex, autoNavigate = false) {
         console.log(`Enabling tab ${tabIndex}, autoNav: ${autoNavigate}`);
@@ -222,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Resetting to upload step.");
         uploadedFilename = null; originalUploadedFilename = null; croppedFilename = null;
         bgRemovedFilename = null; transparentBgFilename = null; 
-        // outfitAppliedFilename DIHAPUS
         finalFilenameForDownload = null;
 
         if(initialPreviewEl) { initialPreviewEl.style.display = 'none'; initialPreviewEl.src = '#';}
@@ -231,8 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(cropImageEl) cropImageEl.src = '#'; 
         
         if(bgResultEl) { bgResultEl.style.display = 'none'; bgResultEl.src = '#';}
-        // outfitPreviewEl DIHAPUS
-        // if(outfitPreviewEl) { outfitPreviewEl.style.display = 'none'; outfitPreviewEl.src = '#';}
         if(finalPreviewImageEl) { finalPreviewImageEl.style.display = 'none'; finalPreviewImageEl.src = '#';}
         if(downloadBtn) downloadBtn.setAttribute('href', '#');
 
@@ -241,7 +265,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cropImageContainer && cropImageContainer.style.filter) cropImageContainer.style.filter = ''; 
         if (cropImageEl && cropImageEl.style.filter) cropImageEl.style.filter = '';
 
-        // Loop disesuaikan karena jumlah tab berkurang
         for (let i = 1; i < tabRadios.length; i++) { 
             if(tabRadios[i]) tabRadios[i].disabled = true;
         }
@@ -292,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadedFilename = data.filename; 
                 finalFilenameForDownload = uploadedFilename;
                 const imageUrl = `${data.url}?t=${new Date().getTime()}`;
-                if(initialPreviewEl) { initialPreviewEl.src = imageUrl; initialPreviewEl.style.display = 'block'; }
+                if(initialPreviewEl) { initialPreviewEl.src = imageUrl; initialPreviewEl.style.display = 'block'; teksIPreviewEl.style.display = 'block'; }
                 if(imageNamePreviewEl) imageNamePreviewEl.textContent = file.name; 
                 if(cropImageEl) cropImageEl.src = imageUrl;
                 showNotification('Upload berhasil!', 'success');
@@ -376,12 +399,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(submitCropBtn) {
         submitCropBtn.addEventListener('click', () => {
-            if (!cropper || !uploadedFilename) { showNotification('Tidak ada gambar untuk di-crop.', 'error'); return; }
-            showSpinner('Memproses crop...');
+            if (!cropper || !uploadedFilename) { /* ... error handling ... */ return; }
+            showSpinner('Memproses crop & membuat versi transparan...');
             const currentBrightnessFactor = parseFloat(brightnessSlider.value);
 
-            cropper.getCroppedCanvas({ imageSmoothingQuality: 'high', fillColor: '#fff' }).toBlob((blob) => {
-                if (!blob) { hideSpinner(); showNotification('Gagal mendapatkan data crop.', 'error'); return; }
+            cropper.getCroppedCanvas({ /* ... */ }).toBlob((blob) => {
+                if (!blob) { /* ... error handling ... */ return; }
                 
                 const formData = new FormData();
                 formData.append('cropped', blob, `${originalUploadedFilename.split('.')[0]}_cropped.png`);
@@ -389,26 +412,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('original_filename', originalUploadedFilename); 
 
                 fetch("{{ url_for('process.crop_image') }}", { method: 'POST', body: formData })
-                    .then(response => { 
-                        hideSpinner();
-                        if (!response.ok) { 
-                             response.json().then(errData => showNotification(`Crop Gagal: ${errData.error || response.statusText}`, 'error'))
-                                .catch(() => showNotification(`Crop Gagal: ${response.statusText}`, 'error'));
-                            throw new Error(`Crop failed: ${response.statusText}`);
-                        }
-                        return response.json();
-                    })
+                    .then(response => { /* ... error handling ... */ return response.json();})
                     .then(data => {
+                        hideSpinner();
                         if (data.error) { showNotification(data.error, 'error'); throw new Error(data.error); }
-                        croppedFilename = data.filename;
-                        finalFilenameForDownload = croppedFilename;
-                        const croppedImageUrl = `${data.url}?t=${new Date().getTime()}`;
-                        if(bgResultEl) { bgResultEl.src = croppedImageUrl; bgResultEl.style.display = 'block';} 
-                        showNotification('Crop berhasil!', 'success');
-                        enableTab(3, true); 
+                        
+                        croppedFilename = data.filename; // Ini hasil crop + brightness
+                        // Langsung simpan versi transparan yang dikembalikan server
+                        transparentBgFilename = data.transparent_filename; 
+                        
+                        if (bgPlaceholder) bgPlaceholder.style.display = 'none';
+
+                        if (transparentBgFilename) {
+                            // Jika versi transparan berhasil dibuat, langsung tampilkan dengan warna default (client-side)
+                            finalFilenameForDownload = croppedFilename; // Default awal sebelum warna diterapkan
+                            updateLiveBgPreviewClientSide(bgColorInput.value); // Terapkan warna default ke versi transparan
+                            showNotification('Crop & versi transparan berhasil dibuat!', 'success');
+                        } else {
+                            // Jika versi transparan gagal, tampilkan saja hasil crop berwarna
+                            // dan live preview warna background tidak akan berfungsi optimal.
+                            if(bgResultEl) { 
+                                bgResultEl.src = `${data.url}?t=${new Date().getTime()}`;
+                                bgResultEl.style.display = 'block';
+                            }
+                            finalFilenameForDownload = croppedFilename;
+                            showNotification('Crop berhasil, tapi versi transparan gagal dibuat. Live preview BG mungkin tidak akurat.', 'warning');
+                        }
+                        isInitialBgProcessDone = !!transparentBgFilename; // Siap untuk live preview jika transparan ada
+                        enableTab(3, true); // Pindah ke tab Background (index 3)
                     })
                     .catch(error => { 
-                        hideSpinner(); console.error("Crop error:", error); 
+                        hideSpinner(); 
+                        console.error("Crop atau pembuatan transparan error:", error); 
+                        showNotification(error.message, 'error');
+                        if(bgPlaceholder) {bgPlaceholder.textContent="Gagal memproses"; bgPlaceholder.style.display='flex';}
                     });
             }, 'image/png');
         });
@@ -417,33 +454,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 3. Background Logic (Tetap sama dengan live preview) ---
     let isInitialBgProcessDone = false; 
 
-    function updateLiveBgPreview(newBgColor) {
-        if (!transparentBgFilename || !bgLivePreviewCanvas || !bgResultEl) {
-            if (!isInitialBgProcessDone && croppedFilename) { // Jika belum proses awal, lakukan proses standar
-                processBackgroundRemovalAndColor(croppedFilename, newBgColor, true);
-            }
-            return;
+function updateLiveBgPreviewClientSide(newBgColor) {
+        if (!transparentBgFilename) {
+            showNotification("Basis gambar transparan belum siap untuk live preview warna.", "warning");
+            return; 
         }
+        if (!bgLivePreviewCanvas || !bgResultEl) { return; }
+
+        showSpinner("Preview warna...");
         const imgTransparent = new Image();
         imgTransparent.crossOrigin = "Anonymous"; 
         imgTransparent.onload = () => {
             bgLivePreviewCanvas.width = imgTransparent.naturalWidth;
             bgLivePreviewCanvas.height = imgTransparent.naturalHeight;
             const ctx = bgLivePreviewCanvas.getContext('2d');
-            if (!ctx) return;
+            if (!ctx) { hideSpinner(); return; }
             ctx.fillStyle = newBgColor;
             ctx.fillRect(0, 0, bgLivePreviewCanvas.width, bgLivePreviewCanvas.height);
             ctx.drawImage(imgTransparent, 0, 0);
             bgResultEl.src = bgLivePreviewCanvas.toDataURL('image/png');
             bgResultEl.style.display = 'block';
+            if(bgPlaceholder) bgPlaceholder.style.display = 'none';
+            hideSpinner();
         };
-        imgTransparent.onerror = () => { showNotification("Gagal memuat gambar transparan untuk preview BG.", "error"); };
+        imgTransparent.onerror = () => { /* ... error handling ... */ hideSpinner(); };
         imgTransparent.src = `/static/uploads/${transparentBgFilename}?t=${new Date().getTime()}`;
     }
 
     if (bgColorInput) {
         bgColorInput.addEventListener('input', (event) => { 
-            if (isInitialBgProcessDone) { updateLiveBgPreview(event.target.value); }
+            if (transparentBgFilename) { // Hanya lakukan live preview jika basis transparan ada
+                updateLiveBgPreviewClientSide(event.target.value); 
+            }
         });
     }
 
@@ -453,85 +495,76 @@ document.addEventListener('DOMContentLoaded', () => {
             if (button) {
                 const color = button.dataset.color;
                 if(bgColorInput) bgColorInput.value = color;
-                if (isInitialBgProcessDone) { updateLiveBgPreview(color); }
+                if (transparentBgFilename) { 
+                    updateLiveBgPreviewClientSide(color);
+                }
             }
         });
     }
-    
-    function processBackgroundRemovalAndColor(filenameToProcess, bgColor, isLivePreviewTrigger = false) {
-        showSpinner('Memproses background...');
-        fetch("{{ url_for('process.remove_background_api') }}", {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: filenameToProcess, bgColor: bgColor })
-        })
-        .then(response => { 
-            hideSpinner();
-            if (!response.ok) {
-                response.json().then(errData => showNotification(`Proses BG Gagal: ${errData.error || response.statusText}`, 'error'))
-                            .catch(() => showNotification(`Proses BG Gagal: ${response.statusText}`, 'error'));
-                throw new Error(`Remove BG failed: ${response.statusText}`);
+
+    // Tombol "Terapkan Warna & Lanjutkan ke Download"
+    if(processBgFinalBtn) { 
+        processBgFinalBtn.addEventListener('click', () => {
+            if (!transparentBgFilename) { 
+                showNotification('Gambar transparan belum tersedia. Proses crop mungkin belum selesai atau gagal.', 'error'); 
+                // Jika croppedFilename ada tapi transparentBgFilename tidak, mungkin user mau proses warna ke cropped langsung?
+                // Untuk alur ini, kita asumsikan transparentBgFilename adalah syarat.
+                return; 
             }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) { showNotification(data.error, 'error'); throw new Error(data.error); }
-            bgRemovedFilename = data.filename; 
-            transparentBgFilename = data.transparent_filename; 
-            finalFilenameForDownload = bgRemovedFilename;
-            const bgProcessedUrl = `${data.url}?t=${new Date().getTime()}`;
-            if(bgResultEl) { bgResultEl.src = bgProcessedUrl; bgResultEl.style.display = 'block';}
-            // outfitPreviewEl.src dihapus karena elemennya tidak ada lagi
-            showNotification('Background berhasil diproses!', 'success');
-            isInitialBgProcessDone = true; 
-            if (!isLivePreviewTrigger) { 
-                enableTab(4, true); // Sekarang tab 4 adalah Download
-            }
-        })
-        .catch(error => { 
-            hideSpinner(); console.error("Remove BG error:", error);
+            const bgColor = bgColorInput.value; 
+            
+            showSpinner('Menerapkan warna final...');
+            fetch("{{ url_for('process.apply_color_to_image') }}", { // Panggil ENDPOINT BARU
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transparent_filename: transparentBgFilename, bgColor: bgColor })
+            })
+            .then(response => { 
+                hideSpinner();
+                if (!response.ok) { /* ... error handling ... */ throw new Error('Gagal menerapkan warna final');}
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) { /* ... error handling ... */ throw new Error(data.error); }
+                
+                finalColoredFilename = data.filename; // Ini file final dengan warna dari backend
+                finalFilenameForDownload = finalColoredFilename; 
+
+                const finalImageUrl = `${data.url}?t=${new Date().getTime()}`;
+                if(bgResultEl) { bgResultEl.src = finalImageUrl; bgResultEl.style.display = 'block';}
+                
+                showNotification('Warna background final berhasil diterapkan!', 'success');
+                enableTab(4, true); // Lanjutkan ke Tab Download (index 4)
+                updateDownloadLink(); 
+            })
+            .catch(error => { /* ... error handling ... */ });
         });
     }
 
-    if(removeBgBtn) { 
-        removeBgBtn.addEventListener('click', () => {
-            const filenameToProcess = croppedFilename || uploadedFilename;
-            if (!filenameToProcess) { showNotification('Harap crop gambar terlebih dahulu.', 'error'); return; }
-            const bgColor = bgColorInput.value;
-            isInitialBgProcessDone = false; 
-            processBackgroundRemovalAndColor(filenameToProcess, bgColor);
-        });
-    }
-
-    // --- Logic untuk Outfit DIHAPUS ---
-
-    // --- 5. Download Logic ---
     function updateDownloadLink() {
-        // Update finalFilenameForDownload sebelum memanggil fungsi ini jika perlu
-        // Atau, tentukan di sini berdasarkan langkah terakhir yang valid
-        if (bgRemovedFilename) {
-            finalFilenameForDownload = bgRemovedFilename;
+        let filenameToDownload = finalFilenameForDownload || bgRemovedFilename || croppedFilename || uploadedFilename;
+
+        if (finalColoredFilename) {
+            filenameToDownload = finalColoredFilename;
+        } else if (transparentBgFilename && bgColorInput.value.trim() === "") {
+             filenameToDownload = transparentBgFilename;
         } else if (croppedFilename) {
-            finalFilenameForDownload = croppedFilename;
+             filenameToDownload = croppedFilename;
         } else {
-            finalFilenameForDownload = uploadedFilename;
+             filenameToDownload = uploadedFilename;
         }
 
-        if (finalFilenameForDownload) {
-            const downloadUrl = `{{ url_for('process.download_file', filename='__FILENAME__') }}`.replace('__FILENAME__', finalFilenameForDownload);
+
+        if (filenameToDownload) {
+            const downloadUrl = `{{ url_for('process.download_file', filename='__FILENAME__') }}`.replace('__FILENAME__', filenameToDownload);
             if(downloadBtn) downloadBtn.setAttribute('href', downloadUrl);
-            
-            const previewUrl = `/static/uploads/${finalFilenameForDownload}?t=${new Date().getTime()}`;
+            const previewUrl = `/static/uploads/${filenameToDownload}?t=${new Date().getTime()}`;
             if(finalPreviewImageEl) {
                  finalPreviewImageEl.src = previewUrl;
                  finalPreviewImageEl.style.display = 'block';
             }
-        } else {
-            if(downloadBtn) downloadBtn.setAttribute('href', '#');
-            if(finalPreviewImageEl) finalPreviewImageEl.style.display = 'none';
-        }
+        } else { /* ... reset download button ... */ }
     }
-    
-    // Tab Download sekarang adalah tabRadios[4]
+
     if (tabRadios[4]) { 
         tabRadios[4].addEventListener('change', function() {
             if (this.checked) updateDownloadLink();

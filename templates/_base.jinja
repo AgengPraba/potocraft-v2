@@ -35,6 +35,12 @@
     {% include 'components/navbar.html' %}
     {% block content%} {% endblock %}
     {% include 'components/footer.html' %}
+    <dialog id="loadingSpinnerModal" class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box text-center">
+    <span class="loading loading-spinner loading-lg text-primary"></span> 
+    <p id="loadingSpinnerMessage" class="py-4 text-lg">Memproses...</p>
+    </div>
+  </dialog>
     {% block scripts %} 
       <script>
         document.addEventListener('DOMContentLoaded', () => {
