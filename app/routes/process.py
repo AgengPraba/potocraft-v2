@@ -519,42 +519,91 @@ def process_enhance_photo():
         return jsonify({'error': 'Tidak ada file gambar'}), 400
     
     file = request.files['image']
-    enhancement_type = request.form.get('enhancement_type', 'sharpen')
-    enhancement_level = request.form.get('enhancement_level', '3')
+    
+    try:
+        # Level peningkatan, default ke 1.0 (tidak ada perubahan signifikan jika faktornya 1)
+        # Slider di frontend (1-5) akan kita map ke faktor yang sesuai
+        enhancement_level = float(request.form.get('enhancement_level', '3')) # Ambil dari form, default ke level 3
+    except ValueError:
+        return jsonify({'error': 'Tingkat peningkatan tidak valid'}), 400
 
     if file.filename == '':
         return jsonify({'error': 'Nama file kosong'}), 400
 
-    # --- AWAL LOGIKA PEMROSESAN (CONTOH DUMMY) ---
-    # Implementasikan logika peningkatan kualitas menggunakan Pillow (ImageEnhance)
-    # Contoh: ImageEnhance.Sharpness(img).enhance(float(enhancement_level))
+    if not allowed_file(file.filename): # Pastikan allowed_file terdefinisi dan bekerja
+        return jsonify({'error': 'Format file tidak diizinkan'}), 400
+        
     try:
-        filename = secure_filename_custom(file.filename)
-        unique_filename = f"enhanced_{uuid.uuid4().hex}_{filename}"
+        # Dapatkan ukuran file asli dalam bytes
+        file.seek(0, os.SEEK_END)
+        original_size_bytes = file.tell()
+        file.seek(0) # Kembalikan pointer ke awal untuk dibaca Pillow
+
+        img = Image.open(file.stream)
+        original_dimensions = img.size # (width, height)
+        
+        # --- Logika Peningkatan Kualitas (Contoh: Pertajam/Sharpen) ---
+        # Anda bisa mengganti atau menambahkan jenis peningkatan lain di sini.
+        # Untuk "sharpen", kita gunakan ImageEnhance.Sharpness
+        # Faktor untuk Pillow's enhance: 0.0 (blur), 1.0 (asli), >1.0 (tajam)
+        # Mapping level frontend (1-5) ke faktor (misal: 1.0 hingga 3.0)
+        # Level 1 -> Faktor 1.0 (tidak ada perubahan)
+        # Level 3 -> Faktor 2.0 (cukup tajam)
+        # Level 5 -> Faktor 3.0 (sangat tajam)
+        sharpness_factor = 1.0 + ((enhancement_level - 1) * 0.5) 
+        
+        enhancer = ImageEnhance.Sharpness(img.convert("RGB")) # Sharpen bekerja lebih baik di RGB
+        img_enhanced = enhancer.enhance(sharpness_factor)
+
+        # Jika gambar asli punya alpha, coba pertahankan
+        if img.mode == 'RGBA' or 'A' in img.getbands():
+            alpha = img.split()[-1] if len(img.split()) == 4 else Image.new('L', img.size, 255)
+            if img_enhanced.mode != 'RGBA':
+                img_enhanced = img_enhanced.convert('RGB') # Pastikan base adalah RGB
+            img_enhanced.putalpha(alpha)
+        # --- Akhir Logika Peningkatan Kualitas ---
+
+        # Simpan gambar yang sudah di-enhance
+        filename = secure_filename_custom(file.filename) # Gunakan fungsi Anda
+        original_base_name, original_ext = os.path.splitext(filename)
+        
+        # Simpan dengan format asli jika memungkinkan, atau default ke PNG jika ada alpha
+        output_format = 'PNG' if img_enhanced.mode == 'RGBA' else original_ext.lstrip('.').upper()
+        if output_format not in ['JPEG', 'PNG', 'WEBP']: # Fallback jika format asli tidak umum
+            output_format = 'PNG'
+        
+        output_ext = f".{output_format.lower()}"
+        unique_filename = f"enhanced_{uuid.uuid4().hex}_{original_base_name}{output_ext}"
         save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
         
-        # Contoh sederhana: simpan file asli saja untuk demo
-        # Anda perlu membuka gambar dengan Pillow, terapkan enhancement, lalu simpan
-        img = Image.open(file.stream)
-        if enhancement_type == 'sharpen':
-            enhancer = ImageEnhance.Sharpness(img)
-            # Level dari 1-5, perlu di-map ke faktor yang sesuai untuk Pillow
-            # Misal: level 1=1.0, 2=1.5, 3=2.0, 4=2.5, 5=3.0
-            factor = 1.0 + ( (float(enhancement_level) -1 ) * 0.5 ) 
-            img_enhanced = enhancer.enhance(factor)
-            img_enhanced.save(save_path)
+        if output_format == 'JPEG':
+            img_enhanced.convert('RGB').save(save_path, output_format, quality=90, optimize=True) # Kualitas JPEG bisa disesuaikan
         else:
-            # Fitur lain (super_resolution, denoise) perlu implementasi lebih lanjut
-            file.save(save_path) # Simpan asli jika enhancement type belum diimplementasi
+            img_enhanced.save(save_path, output_format, optimize=True if output_format == 'PNG' else False)
 
-        current_app.logger.info(f"Proses Enhance (type: {enhancement_type}, level: {enhancement_level}) untuk '{file.filename}'. Disimpan sebagai {unique_filename}")
+        processed_size_bytes = os.path.getsize(save_path)
+        processed_dimensions = img_enhanced.size
+
+        size_change_percent = 0
+        if original_size_bytes > 0:
+            size_change_percent = round(((processed_size_bytes - original_size_bytes) / original_size_bytes) * 100, 2)
+
+        current_app.logger.info(f"Proses Enhance (faktor: {sharpness_factor}) untuk '{file.filename}'. Disimpan sebagai {unique_filename}")
         processed_url = f"/static/uploads/{unique_filename}"
-        return jsonify({'url': processed_url, 'filename': unique_filename})
+        
+        return jsonify({
+            'url': processed_url, 
+            'filename': unique_filename,
+            'original_size_kb': round(original_size_bytes / 1024, 2),
+            'processed_size_kb': round(processed_size_bytes / 1024, 2),
+            'size_change_percent': size_change_percent,
+            'original_dimensions': f"{original_dimensions[0]}x{original_dimensions[1]}",
+            'processed_dimensions': f"{processed_dimensions[0]}x{processed_dimensions[1]}"
+        })
     except Exception as e:
-        current_app.logger.error(f"Error dummy process_enhance_photo: {e}")
-        return jsonify({'error': str(e)}), 500
-    # --- AKHIR LOGIKA PEMROSESAN (CONTOH DUMMY) ---
-
+        current_app.logger.error(f"Error process_enhance_photo: {e}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'Terjadi kesalahan internal server: {str(e)}'}), 500
 
 #============================ fitur kompresi image ============================
 @process_bp.route('/process-compress-photo', methods=['POST'])

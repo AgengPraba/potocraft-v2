@@ -1,11 +1,38 @@
 {% extends '_base.jinja' %}
 {% block title %}Tingkatkan Kualitas Foto - Potocraft{% endblock %}
 
+{% block styles %}
+{{ super() }}
+<style>
+  .preview-image {
+    max-width: 100%; 
+    max-height: 350px;
+    border: 1px solid hsl(var(--b3)); 
+    margin: 0.5rem auto; 
+    background-color: hsl(var(--b2)); 
+    object-fit: contain; 
+    border-radius: var(--rounded-box, 1rem);
+  }
+  .placeholder-box {
+    width: 100%;
+    border-radius: var(--rounded-box, 1rem);
+    background-color: hsl(var(--b3));
+    min-height: 200px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: hsl(var(--bc) / 0.5); 
+    margin: 0.5rem auto;
+  }
+  .image-info p { margin-bottom: 0.25rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card w-full max-w-2xl bg-base-100 shadow-xl mx-auto">
   <div class="card-body">
     <h2 class="card-title text-2xl">Tingkatkan Kualitas Foto</h2>
-    <p>Upload gambar untuk meningkatkan resolusi atau kejernihannya (fitur placeholder).</p>
+    <p>Upload gambar untuk meningkatkan kejernihannya.</p>
 
     <div class="form-control mt-4">
       <label class="label" for="imageUploadEnhance">
@@ -15,25 +42,14 @@
     </div>
 
     <div class="form-control mt-4">
-        <label class="label" for="enhancementType">
-            <span class="label-text">Jenis Peningkatan:</span>
-        </label>
-        <select id="enhancementType" class="select select-bordered w-full">
-            <option value="sharpen">Pertajam (Sharpen)</option>
-            <option value="super_resolution">Resolusi Super (Placeholder)</option>
-            <option value="denoise">Hilangkan Noise (Placeholder)</option>
-        </select>
-    </div>
-     <div class="form-control mt-4">
         <label class="label" for="enhancementLevel">
-            <span class="label-text">Tingkat Peningkatan (1-5):</span>
+            <span class="label-text">Tingkat Peningkatan Kejernihan (1-5):</span>
         </label>
         <input type="range" id="enhancementLevel" min="1" max="5" value="3" class="range range-accent" step="1" />
         <div class="w-full flex justify-between text-xs px-2">
             <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
         </div>
     </div>
-
 
     <div class="card-actions justify-end mt-6">
       <button id="processEnhanceBtn" class="btn btn-accent">Tingkatkan Foto</button>
@@ -42,13 +58,16 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
       <div>
         <h3 class="font-semibold mb-2">Gambar Asli:</h3>
-        <img id="originalPreviewEnhance" src="#" alt="Preview Asli" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
-        <div id="originalPlaceholderEnhance" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Asli</div>
+        <img id="originalPreviewEnhance" src="#" alt="Preview Asli" class="preview-image" style="display:none;"/>
+        <div id="originalPlaceholderEnhance" class="placeholder-box">Preview Asli</div>
+        <div id="originalImageInfo" class="text-xs mt-2 text-center image-info"></div>
       </div>
       <div>
         <h3 class="font-semibold mb-2">Hasil Peningkatan:</h3>
-        <img id="processedPreviewEnhance" src="#" alt="Preview Hasil" class="w-full rounded-md bg-base-300 min-h-48" style="display:none; object-fit: contain;"/>
-        <div id="processedPlaceholderEnhance" class="w-full rounded-md bg-base-300 min-h-48 flex items-center justify-center text-base-content/50">Preview Hasil</div>
+        <img id="processedPreviewEnhance" src="#" alt="Preview Hasil" class="preview-image" style="display:none;"/>
+        <div id="processedPlaceholderEnhance" class="placeholder-box">Preview Hasil</div>
+        <div id="processedImageInfo" class="text-xs mt-2 text-center image-info"></div>
+        <a id="downloadEnhancedBtn" class="btn btn-sm btn-secondary mt-2 w-full" style="display:none;">Unduh Hasil</a>
       </div>
     </div>
   </div>
@@ -62,12 +81,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const imageUpload = document.getElementById('imageUploadEnhance');
     const originalPreview = document.getElementById('originalPreviewEnhance');
     const originalPlaceholder = document.getElementById('originalPlaceholderEnhance');
+    const originalImageInfo = document.getElementById('originalImageInfo'); // Untuk info gambar asli
+
     const processedPreview = document.getElementById('processedPreviewEnhance');
     const processedPlaceholder = document.getElementById('processedPlaceholderEnhance');
-    const enhancementType = document.getElementById('enhancementType');
+    const processedImageInfo = document.getElementById('processedImageInfo'); // Untuk info gambar hasil
+
+    // const enhancementType = document.getElementById('enhancementType'); // DIHAPUS
     const enhancementLevel = document.getElementById('enhancementLevel');
     const processBtn = document.getElementById('processEnhanceBtn');
+    const downloadBtn = document.getElementById('downloadEnhancedBtn'); // Tombol download
     let uploadedFile = null;
+
+    function showNotification(message, type = 'info') { alert(`${type.toUpperCase()}: ${message}`); }
+    function showSpinner(msg="Memproses..."){ console.log(msg); /* Implementasi spinner Anda */ }
+    function hideSpinner(){ console.log("Selesai."); /* Implementasi spinner Anda */ }
 
     imageUpload.addEventListener('change', (event) => {
         const file = event.target.files[0];
@@ -75,12 +103,22 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadedFile = file;
             const reader = new FileReader();
             reader.onload = (e) => {
-                originalPreview.src = e.target.result;
-                originalPreview.style.display = 'block';
-                originalPlaceholder.style.display = 'none';
-                processedPreview.style.display = 'none';
-                processedPlaceholder.style.display = 'block';
-                processedPreview.src = '#';
+                if(originalPreview) {originalPreview.src = e.target.result; originalPreview.style.display = 'block';}
+                if(originalPlaceholder) originalPlaceholder.style.display = 'none';
+                if(originalImageInfo) originalImageInfo.innerHTML = `Dimensi: Memuat... <br> Ukuran: ${(file.size / 1024).toFixed(2)} KB`;
+                // Get original dimensions after image is loaded into preview
+                const img = new Image();
+                img.onload = () => {
+                    if(originalImageInfo) originalImageInfo.innerHTML = `Dimensi: ${img.naturalWidth}x${img.naturalHeight} <br> Ukuran: ${(file.size / 1024).toFixed(2)} KB`;
+                }
+                img.src = e.target.result;
+
+
+                if(processedPreview) processedPreview.style.display = 'none';
+                if(processedPlaceholder) {processedPlaceholder.style.display = 'flex'; processedPlaceholder.textContent = 'Preview Hasil';}
+                if(processedPreview) processedPreview.src = '#';
+                if(processedImageInfo) processedImageInfo.textContent = '';
+                if(downloadBtn) downloadBtn.style.display = 'none';
             }
             reader.readAsDataURL(file);
         }
@@ -88,43 +126,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
     processBtn.addEventListener('click', () => {
         if (!uploadedFile) {
-            alert('Silakan pilih gambar terlebih dahulu.');
+            showNotification('Silakan pilih gambar terlebih dahulu.', 'error');
             return;
         }
         const formData = new FormData();
         formData.append('image', uploadedFile);
-        formData.append('enhancement_type', enhancementType.value);
+        // formData.append('enhancement_type', enhancementType.value); // DIHAPUS
         formData.append('enhancement_level', enhancementLevel.value);
 
-        processedPlaceholder.textContent = 'Memproses...';
-        processedPlaceholder.style.display = 'flex';
-        processedPreview.style.display = 'none';
+        if(processedPlaceholder) {processedPlaceholder.textContent = 'Memproses...'; processedPlaceholder.style.display = 'flex';}
+        if(processedPreview) processedPreview.style.display = 'none';
+        if(downloadBtn) downloadBtn.style.display = 'none';
+        showSpinner("Meningkatkan kualitas foto...");
 
-        fetch("{{ url_for('process.process_enhance_photo') }}", { // Perlu route baru di process.py
+        fetch("{{ url_for('process.process_enhance_photo') }}", {
             method: 'POST',
             body: formData
         })
         .then(response => {
+            hideSpinner();
             if (!response.ok) {
                 return response.json().then(err => { throw new Error(err.error || 'Gagal memproses gambar.')});
             }
             return response.json();
         })
         .then(data => {
-            if (data.url) {
-                processedPreview.src = data.url + '?t=' + new Date().getTime();
-                processedPreview.style.display = 'block';
-                processedPlaceholder.style.display = 'none';
+            if (data.url && data.filename) {
+                if(processedPreview) { processedPreview.src = data.url + '?t=' + new Date().getTime(); processedPreview.style.display = 'block';}
+                if(processedPlaceholder) processedPlaceholder.style.display = 'none';
+
+                let sizeInfo = `Ukuran: ${data.processed_size_kb} KB`;
+                if (typeof data.size_change_percent === 'number') {
+                    const changeText = data.size_change_percent > 0 ? `(${data.size_change_percent}% lebih besar)` : data.size_change_percent < 0 ? `(${Math.abs(data.size_change_percent)}% lebih kecil)` : `(ukuran sama)`;
+                    sizeInfo += ` ${changeText}`;
+                }
+                if(processedImageInfo) processedImageInfo.innerHTML = `Dimensi: ${data.processed_dimensions} <br> ${sizeInfo}`;
+                
+                if(downloadBtn) {
+                    downloadBtn.href = "{{ url_for('process.download_file', filename='PLACEHOLDER') }}".replace('PLACEHOLDER', data.filename);
+                    downloadBtn.download = data.filename; 
+                    downloadBtn.style.display = 'inline-flex'; // Atau 'block' jika ingin full width
+                }
             } else if (data.error) {
                 throw new Error(data.error);
             }
         })
         .catch(error => {
+            hideSpinner();
             console.error('Error:', error);
-            alert('Terjadi kesalahan: ' + error.message);
-            processedPlaceholder.textContent = 'Preview Hasil';
-            processedPlaceholder.style.display = 'flex';
-            processedPreview.style.display = 'none';
+            showNotification('Terjadi kesalahan: ' + error.message, 'error');
+            if(processedPlaceholder) {processedPlaceholder.textContent = 'Preview Hasil'; processedPlaceholder.style.display = 'flex';}
+            if(processedImageInfo) processedImageInfo.textContent = '';
+            if(downloadBtn) downloadBtn.style.display = 'none';
         });
     });
 });
