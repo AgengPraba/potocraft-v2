@@ -274,9 +274,93 @@ def apply_outfit_api():
         current_app.logger.error(f"Error saat menerapkan outfit: {str(e)}")
         return jsonify({"error": f"Gagal menerapkan outfit: {str(e)}"}), 500
 
+@process_bp.route('/download/<filename>')
+def download_file(filename):
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
-#============================ seleksi objek otomatis ============================
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
+#============================ fitur selain pas foto
 
+@process_bp.route('/process-remove-background', methods=['POST'])
+def process_remove_background():
+    if 'image' not in request.files:
+        return jsonify({'error': 'Tidak ada file gambar yang diunggah'}), 400
+    
+    file = request.files['image']
+    # Ambil warna background dari form data. Strip whitespace. Jika kosong, akan jadi background transparan.
+    bg_color_hex = request.form.get('bgColor', '').strip() 
+
+    if file.filename == '':
+        return jsonify({'error': 'Nama file kosong'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Format file tidak diizinkan. Hanya ' + ', '.join(current_app.config['ALLOWED_EXTENSIONS']) + ' yang diizinkan.'}), 400
+
+    try:
+        input_image_bytes = file.read() # Baca file sebagai bytes
+        
+        # 1. Hapus background menggunakan rembg
+        # Fungsi remove() dari rembg bisa menerima bytes dan mengembalikan bytes PNG RGBA (dengan background transparan)
+        img_bytes_no_bg_transparent = remove(input_image_bytes) 
+
+        # Konversi bytes hasil rembg ke objek Image Pillow untuk diproses lebih lanjut
+        # Convert ke "RGBA" untuk memastikan ada channel alpha (transparansi)
+        img_pil_no_bg = Image.open(io.BytesIO(img_bytes_no_bg_transparent)).convert("RGBA")
+
+        output_image_pil = img_pil_no_bg # Defaultnya adalah gambar transparan
+
+        # 2. Jika ada warna background yang valid, terapkan
+        if bg_color_hex and bg_color_hex.startswith('#'):
+            cleaned_hex = bg_color_hex.lstrip('#')
+            if len(cleaned_hex) == 6: # Format #RRGGBB
+                try:
+                    bg_color_rgb = tuple(int(cleaned_hex[i:i+2], 16) for i in (0, 2, 4))
+                    # Buat layer background dengan warna yang diminta
+                    background_layer = Image.new("RGBA", img_pil_no_bg.size, (*bg_color_rgb, 255))
+                    # Komposit gambar transparan di atas background berwarna
+                    output_image_pil = Image.alpha_composite(background_layer, img_pil_no_bg)
+                    current_app.logger.info(f"Menerapkan background warna: {bg_color_hex}")
+                except ValueError:
+                    current_app.logger.warning(f"Format kode warna Hex tidak valid: {bg_color_hex}. Menggunakan background transparan.")
+            elif len(cleaned_hex) == 3: # Format #RGB (contoh: #F00 -> #FF0000)
+                try:
+                    bg_color_rgb = tuple(int(c*2, 16) for c in cleaned_hex) # Konversi #RGB ke #RRGGBB
+                    background_layer = Image.new("RGBA", img_pil_no_bg.size, (*bg_color_rgb, 255))
+                    output_image_pil = Image.alpha_composite(background_layer, img_pil_no_bg)
+                    current_app.logger.info(f"Menerapkan background warna (dari #RGB): {bg_color_hex}")
+                except ValueError:
+                    current_app.logger.warning(f"Format kode warna Hex (#RGB) tidak valid: {bg_color_hex}. Menggunakan background transparan.")
+            else:
+                 current_app.logger.warning(f"Panjang kode warna Hex tidak valid: {bg_color_hex}. Menggunakan background transparan.")
+        else:
+            current_app.logger.info("Tidak ada warna background valid atau diminta transparan. Menghasilkan gambar transparan.")
+            # Jika tidak ada warna yang diminta atau tidak valid, output_image_pil sudah berupa gambar transparan
+
+        # 3. Simpan hasil akhir (selalu sebagai PNG untuk mendukung transparansi)
+        original_filename_secure = secure_filename_custom(file.filename)
+        base_name, _ = os.path.splitext(original_filename_secure)
+        
+        # Buat nama file unik untuk hasil
+        unique_filename = f"removedbg_{uuid.uuid4().hex}_{base_name}.png"
+        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        output_image_pil.save(save_path, 'PNG')
+        
+        current_app.logger.info(f"Proses Hapus BG untuk '{file.filename}'. Disimpan sebagai {unique_filename}")
+        
+        # URL untuk diakses dari frontend (perhatikan, ini mengarah ke folder static/uploads)
+        processed_url = f"/static/uploads/{unique_filename}" 
+
+        return jsonify({'url': processed_url, 'filename': unique_filename})
+
+    except Exception as e:
+        current_app.logger.error(f"Error saat proses remove_background: {e}")
+        # Tambahkan traceback untuk debugging di server log
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'Terjadi kesalahan internal server: {str(e)}'}), 500
+    
 @process_bp.route('/interactive-segmentation', methods=['POST'])
 def process_interactive_segmentation():
     try:
