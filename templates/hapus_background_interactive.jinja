@@ -1,95 +1,107 @@
 {% extends '_base.jinja' %}
-{% block title %}Seleksi Objek & Hapus Background - Potocraft{% endblock %}
+{% block title %}Hapus Background Otomatis - Potocraft{% endblock %}
 
 {% block styles %}
 {{ super() }}
 <style>
-  #interactiveSelectionContainer {
-    position: relative;
-    width: fit-content; 
-    max-width: 100%;
-    margin: 1rem auto;
-    border: 1px solid hsl(var(--b3));
-    user-select: none; /* Mencegah seleksi teks saat menggambar */
-  }
-  #uploadedImageDisplay, #selectionCanvas {
-    display: block; 
-    max-width: 100%;
-    max-height: 70vh; 
-    border-radius: var(--rounded-box, 0.5rem); 
-  }
-  #selectionCanvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    cursor: crosshair; 
-    touch-action: none; 
-  }
-  .preview-image {
-    max-width: 100%; 
-    max-height: 350px;
-    border: 1px solid hsl(var(--b3)); 
-    margin: 0.5rem auto; 
-    background-color: hsl(var(--b2)); 
-    object-fit: contain; 
-    border-radius: var(--rounded-box, 0.5rem);
-  }
-  .placeholder-box {
-    width: 100%;
-    border-radius: var(--rounded-box, 0.5rem);
-    background-color: hsl(var(--b3));
-    min-height: 200px; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: hsl(var(--bc) / 0.5); 
-    margin: 0.5rem auto;
-  }
-  .selection-controls button.active { /* Menggunakan kelas 'btn-active' dari DaisyUI */
-      /* Tidak perlu style custom jika btn-active sudah sesuai */
-  }
+    /* Styling umum untuk preview */
+    .preview-image {
+        max-width: 100%;
+        max-height: 350px;
+        border: 1px solid hsl(var(--b3));
+        margin: 0.5rem auto;
+        background-color: hsl(var(--b2));
+        object-fit: contain;
+        border-radius: var(--rounded-box, 0.5rem);
+        display: block; /* Pastikan selalu block untuk centering */
+    }
+    .placeholder-box {
+        width: 100%;
+        border-radius: var(--rounded-box, 0.5rem);
+        background-color: hsl(var(--b3));
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: hsl(var(--bc) / 0.5);
+        margin: 0.5rem auto;
+    }
+    /* Sembunyikan elemen preview dan download link secara default */
+    #processedPreview, #downloadResultBtn {
+        display: none;
+    }
+    /* Styling untuk input warna */
+    .color-input-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap; /* Untuk responsivitas */
+    }
+    .color-input-group input[type="color"] {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: var(--rounded-btn, 0.5rem);
+        cursor: pointer;
+        background: transparent;
+        padding: 0;
+    }
+    .color-input-group input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+    .color-input-group input[type="color"]::-webkit-color-swatch {
+        border: 1px solid hsl(var(--b3));
+        border-radius: var(--rounded-btn, 0.5rem);
+    }
+    .color-input-group input[type="color"]::-moz-color-swatch-wrapper {
+        padding: 0;
+    }
+    .color-input-group input[type="color"]::-moz-color-swatch {
+        border: 1px solid hsl(var(--b3));
+        border-radius: var(--rounded-btn, 0.5rem);
+    }
+    .color-input-group input[type="text"] {
+        flex-grow: 1; /* Memastikan input teks mengisi ruang */
+        max-width: 150px; /* Batasi lebar input hex */
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="card w-full max-w-4xl bg-base-100 shadow-xl mx-auto">
-  <div class="card-body">
-    <h2 class="card-title text-2xl">Seleksi Objek Interaktif & Hapus Background</h2>
-    <p>Upload gambar, lalu gambar coretan pada objek yang ingin dipertahankan (hijau) dan pada area background yang ingin dihapus (merah).</p>
+<div class="card w-full max-w-xl bg-base-100 shadow-xl mx-auto">
+    <div class="card-body">
+        <h2 class="card-title text-2xl">Hapus Background Otomatis</h2>
+        <p>Upload gambar Anda, dan background akan dihapus secara otomatis. Anda bisa memilih warna background baru atau membiarkannya transparan.</p>
 
-    <div class="form-control mt-4">
-      <label class="label" for="imageUploadInteractive">
-        <span class="label-text">Pilih Gambar</span>
-      </label>
-      <input type="file" id="imageUploadInteractive" accept="image/*" class="file-input file-input-bordered file-input-primary w-full max-w-md" />
-    </div>
+        <div class="form-control mt-4">
+            <label class="label" for="imageUpload">
+                <span class="label-text">Pilih Gambar</span>
+            </label>
+            <input type="file" id="imageUpload" accept="image/*" class="file-input file-input-bordered file-input-primary w-full max-w-md" />
+        </div>
 
-    <div id="interactiveSelectionContainer" class="mt-6" style="display:none;">
-      <img id="uploadedImageDisplay" src="#" alt="Gambar untuk diseleksi" />
-      <canvas id="selectionCanvas"></canvas>
-    </div>
-    
-    <div class="selection-controls flex flex-wrap items-center justify-center gap-2 mt-4" style="display:none;">
-      <p class="w-full text-center text-sm mb-2">Mode Pena:</p>
-      <button id="setForegroundModeBtn" class="btn btn-sm btn-success">Objek (Foreground)</button>
-      <button id="setBackgroundModeBtn" class="btn btn-sm btn-error">Background</button>
-      <div class="w-full md:w-auto flex justify-center gap-2 mt-2 md:mt-0">
-        <button id="undoPointBtn" class="btn btn-sm btn-warning">Undo Coretan Terakhir</button>
-        <button id="resetPointsBtn" class="btn btn-sm btn-ghost">Reset Semua Coretan</button>
-      </div>
-    </div>
+        <div class="color-input-group">
+            <label class="label-text">Warna Background:</label>
+            <input type="color" id="backgroundColorPicker" value="#FFFFFF">
+            <input type="text" id="backgroundColorHex" class="input input-bordered input-sm" value="#FFFFFF" placeholder="#RRGGBB">
+            <button id="setTransparentBtn" class="btn btn-sm btn-ghost">Transparan</button>
+        </div>
 
-    <div class="card-actions justify-center mt-6">
-      <button id="processInteractiveSelectionBtn" class="btn btn-primary btn-wide" disabled>Proses Seleksi & Hapus Background</button>
-    </div>
+        <div class="card-actions justify-center mt-6">
+            <button id="processBackgroundBtn" class="btn btn-primary btn-wide" disabled>Proses Hapus Background</button>
+        </div>
 
-    <div class="mt-6 text-center">
-      <h3 class="font-semibold mb-2">Hasil Proses:</h3>
-      <img id="processedPreviewInteractive" src="#" alt="Preview Hasil Seleksi" class="preview-image" style="display:none;"/>
-      <div id="processedPlaceholderInteractive" class="placeholder-box">Preview Hasil</div>
-      <a id="downloadInteractiveResultBtn" class="btn btn-sm btn-secondary mt-2" style="display:none;">Unduh Hasil</a>
+        <div class="mt-6 text-center">
+            <h3 class="font-semibold mb-2">Hasil Proses:</h3>
+            <img id="processedPreview" src="#" alt="Preview Hasil" class="preview-image"/>
+            <div id="processedPlaceholder" class="placeholder-box">Hasil akan muncul di sini</div>
+            <a id="downloadResultBtn" class="btn btn-sm btn-secondary mt-2">Unduh Hasil</a>
+        </div>
     </div>
-  </div>
 </div>
 {% endblock %}
 
@@ -97,247 +109,126 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const imageUpload = document.getElementById('imageUploadInteractive');
-    const interactiveContainer = document.getElementById('interactiveSelectionContainer');
-    const uploadedImageDisplay = document.getElementById('uploadedImageDisplay');
-    const selectionCanvas = document.getElementById('selectionCanvas');
-    const ctx = selectionCanvas.getContext('2d');
-
-    const setForegroundModeBtn = document.getElementById('setForegroundModeBtn');
-    const setBackgroundModeBtn = document.getElementById('setBackgroundModeBtn');
-    const undoPointBtn = document.getElementById('undoPointBtn'); // Akan diubah menjadi undo stroke
-    const resetPointsBtn = document.getElementById('resetPointsBtn');
-    const processBtn = document.getElementById('processInteractiveSelectionBtn');
+    const imageUpload = document.getElementById('imageUpload');
+    const backgroundColorPicker = document.getElementById('backgroundColorPicker');
+    const backgroundColorHex = document.getElementById('backgroundColorHex');
+    const setTransparentBtn = document.getElementById('setTransparentBtn');
+    const processBtn = document.getElementById('processBackgroundBtn');
     
-    const processedPreview = document.getElementById('processedPreviewInteractive');
-    const processedPlaceholder = document.getElementById('processedPlaceholderInteractive');
-    const downloadBtn = document.getElementById('downloadInteractiveResultBtn');
-    const selectionControls = document.querySelector('.selection-controls');
+    const processedPreview = document.getElementById('processedPreview');
+    const processedPlaceholder = document.getElementById('processedPlaceholder');
+    const downloadBtn = document.getElementById('downloadResultBtn');
 
     let uploadedFile = null;
-    let originalImageSrc = null;
-    let strokes = []; // Array untuk menyimpan setiap goresan/stroke [{type: 'fg'/'bg', points: [{x,y}, ...]}, ...]
-    let currentStroke = null; // Objek untuk stroke yang sedang digambar
-    let isDrawing = false;
-    let currentSelectionMode = 'fg'; 
-    let scaleFactor = 1; 
 
     function showNotification(message, type = 'info') {
+        // Ganti dengan toast/modal DaisyUI jika Anda menggunakannya, ini contoh alert sederhana
         alert(`${type.toUpperCase()}: ${message}`);
         console.log(`Notification (${type}): ${message}`);
     }
 
-    function redrawCanvas() {
-        ctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-        strokes.forEach(stroke => {
-            ctx.beginPath();
-            ctx.strokeStyle = stroke.type === 'fg' ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)';
-            ctx.lineWidth = 5; // Ketebalan garis pena
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            if (stroke.points.length > 0) {
-                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-                for (let i = 1; i < stroke.points.length; i++) {
-                    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-                }
-                ctx.stroke();
-            }
-        });
-    }
-    
-    function updateButtonStyles() {
-        if (currentSelectionMode === 'fg') {
-            setForegroundModeBtn.classList.add('btn-active');
-            setBackgroundModeBtn.classList.remove('btn-active');
-        } else {
-            setBackgroundModeBtn.classList.add('btn-active');
-            setForegroundModeBtn.classList.remove('btn-active');
+    // Sinkronisasi input warna hex dan picker
+    backgroundColorPicker.addEventListener('input', () => {
+        backgroundColorHex.value = backgroundColorPicker.value.toUpperCase();
+    });
+
+    backgroundColorHex.addEventListener('input', () => {
+        let hex = backgroundColorHex.value.trim();
+        // Validasi dasar untuk hex: dimulai dengan # dan panjang 7 karakter
+        if (hex.match(/^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/)) {
+            backgroundColorPicker.value = hex;
         }
-    }
+    });
+
+    setTransparentBtn.addEventListener('click', () => {
+        backgroundColorHex.value = ''; // Kosongkan untuk sinyal transparan ke backend
+        backgroundColorPicker.value = '#000000'; // Set picker ke hitam (tidak relevan jika transparan)
+        showNotification('Background akan menjadi transparan.', 'info');
+    });
 
     imageUpload.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file && file.type.startsWith('image/')) {
             uploadedFile = file;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                originalImageSrc = e.target.result;
-                uploadedImageDisplay.src = originalImageSrc;
-                
-                const displayLoadHandler = () => {
-                    // Hitung scale factor setelah gambar benar-benar dimuat dan memiliki dimensi
-                    if (uploadedImageDisplay.naturalWidth > 0 && uploadedImageDisplay.width > 0) {
-                         scaleFactor = uploadedImageDisplay.naturalWidth / uploadedImageDisplay.width;
-                    } else {
-                        scaleFactor = 1; // Default jika dimensi tidak valid
-                    }
-                   
-                    selectionCanvas.width = uploadedImageDisplay.width;
-                    selectionCanvas.height = uploadedImageDisplay.height;
-                    strokes = []; 
-                    redrawCanvas();
-                    console.log("Canvas and image ready. Scale factor:", scaleFactor);
-                };
-
-                if (uploadedImageDisplay.complete && uploadedImageDisplay.naturalWidth > 0) {
-                    displayLoadHandler(); // Gambar sudah di-cache atau langsung termuat
-                } else {
-                    uploadedImageDisplay.onload = displayLoadHandler;
-                }
-                
-                interactiveContainer.style.display = 'block';
-                selectionControls.style.display = 'flex';
-                processBtn.disabled = false;
-                processedPreview.style.display = 'none';
-                processedPlaceholder.style.display = 'flex';
-                processedPlaceholder.textContent = 'Preview Hasil';
-                if(downloadBtn) downloadBtn.style.display = 'none';
-                updateButtonStyles();
-            }
-            reader.readAsDataURL(file);
-        } else { /* Reset jika file tidak valid */ }
-    });
-
-    function getMousePos(event) {
-        const rect = selectionCanvas.getBoundingClientRect();
-        let x, y;
-        if (event.touches && event.touches.length > 0) { // Touch event
-            x = event.touches[0].clientX - rect.left;
-            y = event.touches[0].clientY - rect.top;
-        } else { // Mouse event
-            x = event.clientX - rect.left;
-            y = event.clientY - rect.top;
+            // Aktifkan tombol proses setelah file diunggah
+            processBtn.disabled = false;
+            
+            // Tampilkan placeholder dan sembunyikan preview/download link
+            processedPreview.style.display = 'none';
+            processedPlaceholder.style.display = 'flex';
+            processedPlaceholder.textContent = 'Gambar siap diproses';
+            downloadBtn.style.display = 'none';
+            
+            // Opsional: tampilkan preview gambar yang diupload (tanpa BG)
+            // const reader = new FileReader();
+            // reader.onload = (e) => {
+            //     // uploadedImageDisplay.src = e.target.result; // Jika Anda masih ingin elemen ini
+            // };
+            // reader.readAsDataURL(file);
+        } else {
+            uploadedFile = null;
+            processBtn.disabled = true;
+            processedPreview.style.display = 'none';
+            processedPlaceholder.style.display = 'flex';
+            processedPlaceholder.textContent = 'Pilih gambar untuk memulai';
+            downloadBtn.style.display = 'none';
+            showNotification('Silakan pilih file gambar yang valid.', 'warning');
         }
-        return { x, y };
-    }
-
-    function startDrawing(event) {
-        if (!originalImageSrc) return;
-        event.preventDefault(); // Mencegah aksi default browser seperti scroll pada touch
-        isDrawing = true;
-        currentStroke = { type: currentSelectionMode, points: [] };
-        const pos = getMousePos(event);
-        currentStroke.points.push(pos);
-        redrawCanvas(); // Mungkin belum perlu redraw di sini, atau hanya titik awal
-    }
-
-    function draw(event) {
-        if (!isDrawing || !currentStroke) return;
-        event.preventDefault();
-        const pos = getMousePos(event);
-        currentStroke.points.push(pos);
-        redrawCanvas(); // Gambar semua stroke termasuk yang sedang digambar
-    }
-
-    function stopDrawing() {
-        if (!isDrawing || !currentStroke) return;
-        if (currentStroke.points.length > 1) { // Hanya simpan stroke jika ada lebih dari 1 titik
-            strokes.push(currentStroke);
-        }
-        isDrawing = false;
-        currentStroke = null;
-        redrawCanvas(); // Final redraw
-        console.log("Strokes:", strokes);
-    }
-
-    selectionCanvas.addEventListener('mousedown', startDrawing);
-    selectionCanvas.addEventListener('mousemove', draw);
-    selectionCanvas.addEventListener('mouseup', stopDrawing);
-    selectionCanvas.addEventListener('mouseleave', stopDrawing); // Hentikan jika mouse keluar canvas
-
-    selectionCanvas.addEventListener('touchstart', startDrawing);
-    selectionCanvas.addEventListener('touchmove', draw);
-    selectionCanvas.addEventListener('touchend', stopDrawing);
-    selectionCanvas.addEventListener('touchcancel', stopDrawing);
-
-
-    setForegroundModeBtn.addEventListener('click', () => {
-        currentSelectionMode = 'fg';
-        updateButtonStyles();
-    });
-    setBackgroundModeBtn.addEventListener('click', () => {
-        currentSelectionMode = 'bg';
-        updateButtonStyles();
-    });
-
-    undoPointBtn.addEventListener('click', () => { // Sekarang menjadi Undo Stroke Terakhir
-        if (strokes.length > 0) {
-            strokes.pop(); // Hapus stroke terakhir
-            redrawCanvas();
-        }
-    });
-
-    resetPointsBtn.addEventListener('click', () => {
-        strokes = [];
-        redrawCanvas();
     });
 
     processBtn.addEventListener('click', () => {
-        if (!uploadedFile || strokes.length === 0) {
-            showNotification('Silakan upload gambar dan buat minimal satu coretan seleksi.', 'error');
-            return;
-        }
-
-        // Konversi semua titik dari semua stroke ke koordinat gambar asli
-        let allOriginalPoints = [];
-        strokes.forEach(stroke => {
-            stroke.points.forEach(p => {
-                allOriginalPoints.push({
-                    x: Math.round(p.x * scaleFactor),
-                    y: Math.round(p.y * scaleFactor),
-                    type: stroke.type 
-                });
-            });
-        });
-
-        if (allOriginalPoints.length === 0) {
-             showNotification('Tidak ada titik seleksi yang valid.', 'error');
+        if (!uploadedFile) {
+            showNotification('Silakan upload gambar terlebih dahulu.', 'error');
             return;
         }
 
         const formData = new FormData();
         formData.append('image', uploadedFile);
-        formData.append('points', JSON.stringify(allOriginalPoints)); // Kirim semua titik
+        // Kirim nilai dari input hex. Jika kosong, backend akan mengartikannya sebagai transparan.
+        formData.append('bgColor', backgroundColorHex.value.trim()); 
 
-        processedPlaceholder.textContent = 'Memproses seleksi...';
-        // ... (sisa logika fetch, sama seperti sebelumnya) ...
-        fetch("{{ url_for('process.process_interactive_segmentation') }}", {
+        processedPlaceholder.textContent = 'Memproses penghapusan background...';
+        processBtn.disabled = true; // Nonaktifkan tombol saat memproses
+
+        // Panggil endpoint backend yang baru
+        fetch("{{ url_for('process.process_remove_background') }}", { 
             method: 'POST',
             body: formData
         })
         .then(response => {
             if (!response.ok) {
+                // Tangkap error dari JSON response jika ada
                 return response.json().then(err => { 
-                    throw new Error(err.error || 'Gagal memproses seleksi gambar.')
+                    throw new Error(err.error || 'Gagal memproses penghapusan background.');
                 });
             }
             return response.json();
         })
         .then(data => {
             if (data.url && data.filename) {
-                processedPreview.src = data.url + '?t=' + new Date().getTime();
+                processedPreview.src = data.url + '?t=' + new Date().getTime(); // Tambah timestamp untuk cache busting
                 processedPreview.style.display = 'block';
                 processedPlaceholder.style.display = 'none';
-                if(downloadBtn) {
-                    downloadBtn.href = "{{ url_for('process.download_file', filename='PLACEHOLDER') }}".replace('PLACEHOLDER', data.filename);
-                    downloadBtn.download = data.filename; 
-                    downloadBtn.style.display = 'inline-flex';
-                }
+                downloadBtn.href = "{{ url_for('process.download_file', filename='PLACEHOLDER') }}".replace('PLACEHOLDER', data.filename);
+                downloadBtn.download = data.filename; 
+                downloadBtn.style.display = 'inline-flex';
+                showNotification('Background berhasil dihapus!', 'success');
             } else if (data.error) {
-                throw new Error(data.error);
+                throw new Error(data.error); // Tangkap error dari data.error
             }
         })
         .catch(error => {
             console.error('Error:', error);
             showNotification('Terjadi kesalahan: ' + error.message, 'error');
-            processedPlaceholder.textContent = 'Preview Hasil';
-            processedPlaceholder.style.display = 'flex'; // Tampilkan kembali placeholder
+            processedPlaceholder.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+            processedPlaceholder.style.display = 'flex';
             processedPreview.style.display = 'none';
-             if(downloadBtn) downloadBtn.style.display = 'none';
+            downloadBtn.style.display = 'none';
+        })
+        .finally(() => {
+            processBtn.disabled = false; // Aktifkan kembali tombol setelah selesai
         });
     });
-    
-    updateButtonStyles(); // Inisialisasi style tombol
 });
 </script>
 {% endblock %}
