@@ -274,12 +274,6 @@ def apply_outfit_api():
         current_app.logger.error(f"Error saat menerapkan outfit: {str(e)}")
         return jsonify({"error": f"Gagal menerapkan outfit: {str(e)}"}), 500
 
-@process_bp.route('/download/<filename>')
-def download_file(filename):
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 #============================ fitur selain pas foto
 
 @process_bp.route('/process-remove-background', methods=['POST'])
